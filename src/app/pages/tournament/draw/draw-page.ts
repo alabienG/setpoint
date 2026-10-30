@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { DrawMode, Match, Tournament } from '../../../core/models';
 import { matchTime, teamRating } from '../../../domain/draw';
 import { DrawResult, drawBlockers, generateDraw } from '../../../domain/tournament-engine';
+import { assignReferees } from '../../../domain/referees';
 import { Icon } from '../../../shared/icon';
 import { matchTagClass, poolTagClass } from '../../../shared/match-display';
 import { TournamentContext } from '../tournament-context';
@@ -50,7 +51,10 @@ export class DrawPage {
         matches: t.matches.filter((m) => (m.phase !== 'bracket' || t.format === 'elim') && (m.stage ?? 1) === 1),
       };
     }
-    return this.blockers().length ? null : generateDraw(t);
+    if (this.blockers().length) return null;
+    // Aperçu avec les arbitres, tels qu'ils seront attribués à la validation.
+    const preview = assignReferees({ ...t, ...generateDraw(t) });
+    return { pools: preview.pools, matches: preview.matches };
   });
 
   protected readonly slots = computed(() => {

@@ -144,10 +144,21 @@
         </div>
       }
 
+      <label class="toggle">
+        <input type="checkbox" [checked]="s.selfRefereeing" [disabled]="locked()" (change)="setSelfRefereeing($event)" />
+        <span>
+          <strong>Auto-arbitrage</strong>
+          Chaque match est arbitré par une équipe qui ne joue pas sur ce créneau, à tour de rôle.
+          @if (s.selfRefereeing && courtsLimited()) {
+            <em>Avec {{ t().teams.length }} équipes, {{ usableCourts() }} matchs au plus en même temps (3 équipes par match).</em>
+          }
+        </span>
+      </label>
+
       <div class="points">
         <strong>Classement</strong>
         @if (mixer()) {
-          <span>Au total de points marqués dans la poule. En cas d’égalité, la confrontation directe départage.</span>
+          <span>À l’écart de points (points marqués − points encaissés). En cas d’égalité, la confrontation directe départage.</span>
         } @else if (s.setsToWin === 1) {
           <span>Victoires, puis écart de points, puis points marqués, puis confrontation directe.</span>
         } @else {

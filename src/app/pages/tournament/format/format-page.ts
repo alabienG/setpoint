@@ -11,6 +11,7 @@ import {
   mixerPoolSizes,
 } from '../../../domain/formats';
 import { Icon } from '../../../shared/icon';
+import { usableCourts } from '../../../domain/tournament-engine';
 import { TournamentContext } from '../tournament-context';
 import { FormatIcon } from './format-icon';
 
@@ -35,6 +36,10 @@ export class FormatPage {
   protected readonly selectedName = computed(() => formatName(this.t().format));
   protected readonly minTeams = computed(() => Math.max(2, this.t().teams.length));
   protected readonly mixer = computed(() => this.t().format === 'mixer');
+  protected readonly usableCourts = computed(() => usableCourts(this.t()));
+  protected readonly courtsLimited = computed(
+    () => this.t().teams.length > 0 && this.usableCourts() < this.t().settings.courts,
+  );
   protected readonly mixerMin = MIXER_MIN_TEAMS;
   protected readonly mixerMax = MIXER_MAX_TEAMS;
   protected readonly mixerMinMax = computed(() => Math.max(MIXER_MIN_TEAMS, this.t().teams.length));
@@ -71,6 +76,10 @@ export class FormatPage {
 
   protected setNumber(key: NumericSetting, event: Event, min: number, max: number): void {
     this.ctx.store.updateSettings(this.t().id, { [key]: this.readNumber(event, min, max) });
+  }
+
+  protected setSelfRefereeing(event: Event): void {
+    this.ctx.store.setSelfRefereeing(this.t().id, (event.target as HTMLInputElement).checked);
   }
 
   protected setCap(event: Event): void {

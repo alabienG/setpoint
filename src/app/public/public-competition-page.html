@@ -91,7 +91,7 @@
                             <th scope="col"><abbr title="Joués">J</abbr></th>
                             <th scope="col"><abbr title="Victoires">V</abbr></th>
                             <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
-                            <th scope="col">{{ pointsOnly() ? 'Pts' : 'Pts cl.' }}</th>
+                            <th scope="col">{{ diffRanking() ? 'Pts +' : 'Pts cl.' }}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -102,8 +102,13 @@
                               </td>
                               <td>{{ r.played }}</td>
                               <td>{{ r.wins }}</td>
-                              <td class="muted">{{ r.diff > 0 ? '+' : '' }}{{ r.diff }}</td>
-                              <td><strong>{{ pointsOnly() ? r.pointsFor : r.rankingPoints }}</strong></td>
+                              @if (diffRanking()) {
+                                <td><strong>{{ r.diff > 0 ? '+' : '' }}{{ r.diff }}</strong></td>
+                                <td class="muted">{{ r.pointsFor }}</td>
+                              } @else {
+                                <td class="muted">{{ r.diff > 0 ? '+' : '' }}{{ r.diff }}</td>
+                                <td><strong>{{ r.rankingPoints }}</strong></td>
+                              }
                             </tr>
                           }
                         </tbody>
@@ -194,6 +199,9 @@
     <span class="line"><span class="name" [class.win]="c.winner === 'b'">{{ c.b }}</span><span class="score">{{ c.scoreB }}</span></span>
     @if (c.detail) {
       <span class="detail num">{{ c.detail }}</span>
+    }
+    @if (c.referee) {
+      <span class="detail">Arbitre : {{ c.referee }}</span>
     }
   </article>
 </ng-template>

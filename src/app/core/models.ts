@@ -51,6 +51,8 @@ export interface TournamentSettings extends MatchRules {
   slotMinutes: number;
   /** Règles des phases 1 à 3 du format « Poules brassées ». */
   phases: PhaseRules[];
+  /** Auto-arbitrage : chaque match est arbitré par une équipe qui ne joue pas sur ce créneau. */
+  selfRefereeing: boolean;
 }
 
 export type SetScore = [number | null, number | null];
@@ -84,6 +86,8 @@ export interface Match {
   bye?: boolean;
   /** Set en cours de saisie sur la vue mobile. */
   liveSet?: number;
+  /** Équipe qui arbitre le match (auto-arbitrage). */
+  referee?: string;
 }
 
 export interface Pool {
@@ -126,6 +130,7 @@ export const DEFAULT_SETTINGS: TournamentSettings = {
   decidingSetPoints: 15,
   cap: null,
   phases: DEFAULT_PHASES,
+  selfRefereeing: false,
   courts: 2,
   maxTeams: 8,
   poolCount: 2,

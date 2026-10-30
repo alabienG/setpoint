@@ -115,6 +115,35 @@
     font-size: 13px;
   }
 }
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  cursor: pointer;
+  input {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: var(--orange);
+    flex: none;
+  }
+  strong {
+    display: block;
+    color: var(--ink);
+  }
+  em {
+    display: block;
+    margin-top: 4px;
+    font-style: normal;
+    color: var(--orange-dark);
+  }
+}
 .points {
   padding: 14px;
   background: var(--bg);

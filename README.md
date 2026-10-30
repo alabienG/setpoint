@@ -46,7 +46,16 @@ Trois phases de poules de 4 (ou de 3 quand il manque des équipes) ; 4 poules de
 Les places du brassage qui n'existent pas restent vides ; une poule réduite à 2 équipes récupère
 la dernière équipe de la poule de 4 la plus proche au-dessus.
 
-Classement d'une poule : total de points marqués ; deux équipes à égalité se départagent à la confrontation directe.
+Classement d'une poule : écart de points (marqués − encaissés) ; deux équipes à égalité se départagent à la confrontation directe.
+
+### Auto-arbitrage
+
+Option de l'étape Format, avant le tirage : chaque match est arbitré par une équipe qui ne joue pas
+sur ce créneau ; on choisit toujours celle qui a le moins arbitré (sur tout le tournoi), de préférence
+dans la même poule. Chaque match mobilisant trois équipes, le planning ne programme pas plus de
+matchs simultanés que le nombre d'équipes divisé par trois. En poules, l'écart entre équipes est d'au
+plus un arbitrage ; en tableau final, il peut monter à deux (seules les équipes éliminées sont libres
+pour les derniers tours). Logique : `src/app/domain/referees.ts`.
 
 ### Import des participants
 

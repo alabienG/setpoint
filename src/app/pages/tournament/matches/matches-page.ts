@@ -74,6 +74,7 @@ export class MatchesPage {
           setsB: started ? (single ? result.pointsB : result.setsB) : '–',
           winner: m.status === 'done' ? result.winner : null,
           detail: playedSets(m).map((s) => `${s[0]}-${s[1]}`).join('  ·  ') || 'Pas encore commencé',
+          referee: m.referee ? this.ctx.teamName(m.referee) : null,
         };
       });
   });
@@ -132,6 +133,7 @@ export class MatchesPage {
       ready,
       tag: matchTag(m),
       rules: describeRules(rules),
+      referee: m.referee ? this.ctx.teamName(m.referee) : null,
       short: (side: Side) => this.ctx.slotName(m, side).replace(/^(Les|Le|La)\s+/i, ''),
       result,
       sets: m.sets.map((score, i) => {

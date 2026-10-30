@@ -20,7 +20,8 @@ import {
   mixerPoolCount,
   mixerPoolSizes,
 } from './formats';
-import { TeamStats, comparePointsScored, compareStats, computeStats, emptySets, standings, winnerSide } from './scoring';
+import { assignReferees } from './referees';
+import { TeamStats, comparePointDifference, compareStats, computeStats, emptySets, standings, winnerSide } from './scoring';
 
 export interface DrawResult {
   pools: Pool[];
@@ -33,6 +34,20 @@ const AVAILABLE_FORMATS = ['pools', 'mixer', 'elim', 'league'];
 export function matchRules(t: Tournament, match: Match): MatchRules {
   if (t.format === 'mixer' && match.stage) return t.settings.phases[match.stage - 1] ?? t.settings;
   return t.settings;
+}
+
+/**
+ * Terrains utilisables en même temps. En auto-arbitrage, chaque match mobilise trois équipes
+ * (deux qui jouent, une qui arbitre) : on ne programme pas plus de matchs simultanés que
+ * le nombre d'équipes divisé par trois.
+ */
+export function usableCourts(t: Tournament): number {
+  if (!t.settings.selfRefereeing) return t.settings.courts;
+  return Math.max(1, Math.min(t.settings.courts, Math.floor(t.teams.length / 3)));
+}
+
+function schedulingSettings(t: Tournament) {
+  return { ...t.settings, courts: usableCourts(t) };
 }
 
 function rulesSource(t: Tournament): (match: Match) => MatchRules {
@@ -102,7 +117,7 @@ function mixerStageMatches(t: Tournament, pools: Pool[], stage: number): Match[]
   const phaseStart = previous.length
     ? Math.max(...previous.map((m) => (m.start ?? 0) + (t.settings.phases[(m.stage ?? 1) - 1]?.minutes ?? 0)))
     : startMinutes(t.settings);
-  return schedule(matches, t.settings, firstSlot).map((m) => ({ ...m, start: phaseStart + (m.slot - firstSlot) * rules.minutes }));
+  return schedule(matches, schedulingSettings(t), firstSlot).map((m) => ({ ...m, start: phaseStart + (m.slot - firstSlot) * rules.minutes }));
 }
 
 /** Calcule le tirage (poules et rencontres) sans rien enregistrer : sert à l'aperçu et à la validation. */
@@ -131,7 +146,7 @@ export function generateDraw(t: Tournament): DrawResult {
           }
         });
       }
-      return { pools, matches: schedule(matches, t.settings) };
+      return { pools, matches: schedule(matches, schedulingSettings(t)) };
     }
     case 'league': {
       const matches = roundRobin(ordered).flatMap((pairs, r) =>
@@ -139,25 +154,25 @@ export function generateDraw(t: Tournament): DrawResult {
           newMatch(nextId(), { phase: 'league', round: r + 1, label: `Journée ${r + 1}` }, a, b, t.settings),
         ),
       );
-      return { pools: [], matches: schedule(matches, t.settings) };
+      return { pools: [], matches: schedule(matches, schedulingSettings(t)) };
     }
     case 'elim':
       return {
         pools: [],
-        matches: schedule(resolveBracket(buildBracket(ordered, t.settings, 'm'), t.settings), t.settings),
+        matches: schedule(resolveBracket(buildBracket(ordered, t.settings, 'm'), t.settings), schedulingSettings(t)),
       };
     default:
       return { pools: [], matches: [] };
   }
 }
 
-/** Classement d'une poule. En « Poules brassées », il se fait au total de points marqués, puis à la confrontation directe. */
+/** Classement d'une poule. En « Poules brassées », il se fait à l'écart de points, puis à la confrontation directe. */
 export function poolStandings(t: Tournament, pool: Pool): TeamStats[] {
   return standings(
     pool.teamIds,
     t.matches.filter((m) => m.phase === 'pool' && m.pool === pool.letter && m.stage === pool.stage),
     rulesSource(t),
-    t.format === 'mixer' ? comparePointsScored : compareStats,
+    t.format === 'mixer' ? comparePointDifference : compareStats,
   );
 }
 
@@ -312,7 +327,7 @@ export function qualifierTags(t: Tournament): Map<string, string> {
 export function generateFinals(t: Tournament): Match[] {
   const lastSlot = Math.max(-1, ...t.matches.map((m) => m.slot));
   const bracket = resolveBracket(buildBracket(poolQualifiers(t), t.settings, 'f'), t.settings);
-  return schedule(bracket, t.settings, lastSlot + 1);
+  return schedule(bracket, schedulingSettings(t), lastSlot + 1);
 }
 
 export function isFinished(t: Tournament): boolean {
@@ -327,6 +342,7 @@ export function isFinished(t: Tournament): boolean {
 export function normalize(t: Tournament): Tournament {
   let next = t;
   if (hasBracket(next)) next = { ...next, matches: resolveBracket(next.matches, next.settings) };
+  next = assignReferees(next);
   if (next.stage === 'running' && isFinished(next)) next = { ...next, stage: 'finished' };
   return next;
 }

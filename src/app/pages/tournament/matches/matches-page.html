@@ -73,6 +73,9 @@
               <span class="sets">{{ c.setsB }}</span>
             </span>
             <span class="detail num">{{ c.detail }}</span>
+            @if (c.referee) {
+              <span class="referee">Arbitre : {{ c.referee }}</span>
+            }
           </button>
         } @empty {
           <p class="muted">Aucun match dans cette catégorie.</p>
@@ -87,7 +90,12 @@
             <span class="eyebrow">Saisie du score</span>
             <span>{{ e.tag }} · Terrain {{ e.m.court }}</span>
           </div>
-          <span class="rules">{{ e.rules }}</span>
+          <span class="rules">
+            {{ e.rules }}
+            @if (e.referee) {
+              · Arbitre : <strong>{{ e.referee }}</strong>
+            }
+          </span>
 
           <div class="score-grid">
             <span class="col-label">Set</span>
@@ -158,10 +166,7 @@
                   <th class="left" scope="col">Équipe</th>
                   <th scope="col"><abbr title="Joués">J</abbr></th>
                   <th scope="col"><abbr title="Victoires">V</abbr></th>
-                  @if (t().format === 'mixer') {
-                    <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
-                    <th scope="col"><abbr title="Points marqués (critère de classement)">Pts</abbr></th>
-                  } @else if (singleSet) {
+                  @if (singleSet) {
                     <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
                     <th scope="col"><abbr title="Points marqués">Pts +</abbr></th>
                   } @else {
@@ -181,10 +186,7 @@
                     </td>
                     <td>{{ r.played }}</td>
                     <td>{{ r.wins }}</td>
-                    @if (t().format === 'mixer') {
-                      <td class="muted">{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</td>
-                      <td><strong>{{ r.pointsFor }}</strong></td>
-                    } @else if (singleSet) {
+                    @if (singleSet) {
                       <td><strong>{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</strong></td>
                       <td class="muted">{{ r.pointsFor }}</td>
                     } @else {

@@ -62,6 +62,7 @@ export class LiveScorePage {
       done: m.status === 'done',
       single,
       where: `${matchTag(m)} · Terrain ${m.court}`,
+      referee: m.referee ? this.ctx.teamName(m.referee) : null,
       setLabel: m.status === 'done' || over ? 'TERMINÉ' : single ? 'SET UNIQUE' : decisive ? 'SET DÉCISIF' : `SET ${index + 1}`,
       history: m.sets.slice(0, index).map((s, i) => `S${i + 1} · ${s[0] ?? 0}-${s[1] ?? 0}`),
       hint,

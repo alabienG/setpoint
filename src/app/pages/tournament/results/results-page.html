@@ -51,7 +51,8 @@
                 <li>
                   <span class="place">{{ mp.stage === 3 ? p.offset + i + 1 : i + 1 }}</span>
                   <span class="mixer-name">{{ row.name }}</span>
-                  <span class="num muted"><strong class="pts">{{ row.pointsFor }} pts</strong> · {{ row.wins }} V</span>
+                  @let diff = row.pointsFor - row.pointsAgainst;
+                  <span class="num muted"><strong>{{ diff > 0 ? '+' : '' }}{{ diff }}</strong> · {{ row.wins }} V</span>
                 </li>
               }
             </ol>

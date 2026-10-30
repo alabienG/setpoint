@@ -135,7 +135,12 @@
                 <div class="game">
                   <span [class]="tagClass(g)">{{ g.phase === 'pool' ? g.pool : g.label }}</span>
                   <span class="vs"><strong>{{ name(g, 'a') }}</strong> <span class="muted">vs</span> <strong>{{ name(g, 'b') }}</strong></span>
-                  <span class="court">Terrain {{ g.court }}</span>
+                  <span class="court">
+                    Terrain {{ g.court }}
+                    @if (g.referee) {
+                      · arb. {{ ctx.teamName(g.referee) }}
+                    }
+                  </span>
                 </div>
               }
             </div>

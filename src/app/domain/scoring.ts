@@ -159,9 +159,9 @@ export function compareStats(x: TeamStats, y: TeamStats): number {
   );
 }
 
-/** Classement aux seuls points marqués (format « Poules brassées »). */
-export function comparePointsScored(x: TeamStats, y: TeamStats): number {
-  return y.pointsFor - x.pointsFor;
+/** Classement à l'écart de points (points marqués − points encaissés), format « Poules brassées ». */
+export function comparePointDifference(x: TeamStats, y: TeamStats): number {
+  return y.pointsFor - y.pointsAgainst - (x.pointsFor - x.pointsAgainst);
 }
 
 /**

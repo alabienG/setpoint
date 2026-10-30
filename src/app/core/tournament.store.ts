@@ -128,6 +128,11 @@ export class TournamentStore {
     }));
   }
 
+  /** Auto-arbitrage : réglé avant le tirage, car il limite le nombre de matchs simultanés. */
+  setSelfRefereeing(id: string, selfRefereeing: boolean): void {
+    this.updateSetup(id, (t) => ({ ...t, settings: { ...t.settings, selfRefereeing } }));
+  }
+
   setTeamRating(id: string, teamId: string, rating: number): void {
     this.updateSetup(id, (t) => ({
       ...t,

@@ -42,6 +42,7 @@ function toCard(t: Tournament, m: Match, name: NameOf) {
     scoreB: started ? (single ? result.pointsB : result.setsB) : '–',
     winner: m.status === 'done' ? result.winner : null,
     detail: single ? '' : playedSets(m).map((s) => `${s[0]}-${s[1]}`).join(' · '),
+    referee: m.referee ? name(m.referee) : null,
   };
 }
 
@@ -130,7 +131,8 @@ export class PublicCompetitionPage {
     }));
   });
 
-  protected readonly pointsOnly = computed(() => this.t()?.format === 'mixer');
+  /** Poules brassées : classement à l'écart de points (mis en avant), points marqués à titre indicatif. */
+  protected readonly diffRanking = computed(() => this.t()?.format === 'mixer');
   protected readonly ranking = computed<RankingRow[]>(() =>
     this.t() && this.t()!.stage !== 'setup' ? finalRanking(this.t()!) : [],
   );

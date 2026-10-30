@@ -6,6 +6,9 @@
       </a>
       <div class="where">
         <span>{{ s.where }}</span>
+        @if (s.referee) {
+          <span>Arbitre : {{ s.referee }}</span>
+        }
         <span class="live"><span class="dot" aria-hidden="true"></span>EN DIRECT · {{ s.setLabel }}</span>
       </div>
       <button type="button" class="round-btn" aria-label="Annuler le dernier point" [disabled]="!canUndo()" (click)="undo()">

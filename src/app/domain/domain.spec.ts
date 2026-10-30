@@ -3,6 +3,7 @@ import { buildBracket, resolveBracket, seedOrder } from './bracket';
 import { distributeIntoPools, roundRobin, schedule } from './draw';
 import { estimateMatches } from './formats';
 import { emptySets, evaluateMatch, setWinner, standings } from './scoring';
+import { refereeCounts } from './referees';
 import { googleSheetCsvUrl, parseTeams } from './team-import';
 import {
   canGenerateFinals,
@@ -362,26 +363,111 @@ describe('classement des poules brassées', () => {
     return poolStandings(t, t.pools[0]).map((r) => r.teamId);
   }
 
-  it('classe au total de points marqués, même avec moins de victoires', () => {
-    // t2 gagne 1 match et marque 39 points ; t3 en gagne 2 mais ne marque que 38 points.
+  it('classe à l’écart de points, même avec moins de victoires', () => {
+    // t2 ne gagne qu'un match mais avec un gros écart (+15) ; t3 (+4) et t1 (+2) en gagnent deux.
     expect(
       pool([
-        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't2' }, sets: [[21, 20]] },
-        { ...base, id: '2', a: { teamId: 't3' }, b: { teamId: 't4' }, sets: [[19, 2]] },
-        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't3' }, sets: [[19, 0]] },
-        { ...base, id: '4', a: { teamId: 't3' }, b: { teamId: 't1' }, sets: [[19, 4]] },
+        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't2' }, sets: [[19, 17]] },
+        { ...base, id: '2', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 2]] },
+        { ...base, id: '3', a: { teamId: 't3' }, b: { teamId: 't1' }, sets: [[19, 17]] },
+        { ...base, id: '4', a: { teamId: 't3' }, b: { teamId: 't4' }, sets: [[19, 17]] },
+        { ...base, id: '5', a: { teamId: 't1' }, b: { teamId: 't4' }, sets: [[20, 18]] },
       ]),
     ).toEqual(['t2', 't3', 't1', 't4']);
   });
 
-  it('départage deux équipes à égalité de points par la confrontation directe', () => {
-    // t1 et t2 ont 36 points chacun ; t2 a battu t1.
+  it('ne tient pas compte du total de points marqués', () => {
+    // t1 marque 40 points pour un écart de +3 ; t2 n'en marque que 19, mais pour un écart de +19.
+    expect(
+      pool([
+        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't3' }, sets: [[21, 20]] },
+        { ...base, id: '2', a: { teamId: 't1' }, b: { teamId: 't4' }, sets: [[19, 17]] },
+        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 0]] },
+      ]),
+    ).toEqual(['t2', 't1', 't3', 't4']);
+  });
+
+  it('départage deux équipes à égalité d’écart par la confrontation directe', () => {
+    // t1 et t2 sont à +17 chacun ; t2 a battu t1.
     expect(
       pool([
         { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't2' }, sets: [[17, 19]] },
         { ...base, id: '2', a: { teamId: 't1' }, b: { teamId: 't3' }, sets: [[19, 0]] },
-        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[17, 19]] },
+        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 4]] },
       ]),
     ).toEqual(['t2', 't1', 't4', 't3']);
+  });
+});
+
+describe('auto-arbitrage', () => {
+  function run(format: Tournament['format'], teamCount: number, selfRefereeing = true): Tournament {
+    const base = tournament(format, teamCount);
+    let t: Tournament = {
+      ...base,
+      drawMode: format === 'mixer' ? 'level' : base.drawMode,
+      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: 16, selfRefereeing },
+      teams: base.teams.map((team, i) => ({ ...team, rating: 5 - i / 4 })),
+    };
+    t = normalize({ ...t, ...generateDraw(t), stage: 'running' });
+    t = playAll(t);
+    if (format === 'pools') t = playAll(normalize({ ...t, matches: [...t.matches, ...generateFinals(t)] }));
+    if (format === 'mixer') {
+      for (const _ of [2, 3]) {
+        const next = generateNextStage(t);
+        t = playAll(normalize({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] }));
+      }
+    }
+    return t;
+  }
+
+  function expectValidReferees(t: Tournament): number[] {
+    const played = t.matches.filter((m) => m.slot >= 0 && !m.bye);
+    for (const m of played) {
+      expect(m.referee).toBeDefined();
+      expect([m.a.teamId, m.b.teamId]).not.toContain(m.referee);
+    }
+    // Sur un même créneau, personne ne joue deux fois ni ne joue et arbitre à la fois.
+    const slots = new Set(played.map((m) => m.slot));
+    for (const slot of slots) {
+      const people = played.filter((m) => m.slot === slot).flatMap((m) => [m.a.teamId, m.b.teamId, m.referee]);
+      expect(new Set(people).size).toBe(people.length);
+    }
+    return [...refereeCounts(t).values()];
+  }
+
+  for (const n of [16, 15, 13, 12, 9]) {
+    it(`répartit l’arbitrage équitablement en poules brassées à ${n} équipes`, () => {
+      const counts = expectValidReferees(run('mixer', n));
+      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  // En tableau final, seules les équipes déjà éliminées peuvent arbitrer les derniers tours
+  // (les autres jouent sur le même créneau) : un écart de 2 est inévitable sans connaître
+  // les vainqueurs à l'avance.
+  it('attribue les arbitres de la phase finale quand les qualifiés sont connus', () => {
+    const counts = expectValidReferees(run('pools', 8));
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(2);
+  });
+
+  it('fonctionne en élimination directe', () => {
+    const counts = expectValidReferees(run('elim', 8));
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(2);
+  });
+
+  it('répartit l’arbitrage équitablement en championnat', () => {
+    const counts = expectValidReferees(run('league', 8));
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+  });
+
+  it('limite les matchs simultanés au nombre d’équipes divisé par trois', () => {
+    const t = run('league', 8);
+    const perSlot = new Map<number, number>();
+    t.matches.forEach((m) => perSlot.set(m.slot, (perSlot.get(m.slot) ?? 0) + 1));
+    expect(Math.max(...perSlot.values())).toBe(2);
+  });
+
+  it('n’attribue aucun arbitre si l’option est désactivée', () => {
+    expect(run('mixer', 16, false).matches.some((m) => m.referee)).toBe(false);
   });
 });
