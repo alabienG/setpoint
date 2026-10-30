@@ -1,0 +1,61 @@
+<main class="screen">
+  @if (state(); as s) {
+    <div class="top">
+      <a class="round-btn" [routerLink]="backLink()" aria-label="Retour aux matchs">
+        <app-icon name="back" [size]="20" [strokeWidth]="2.4" />
+      </a>
+      <div class="where">
+        <span>{{ s.where }}</span>
+        <span class="live"><span class="dot" aria-hidden="true"></span>EN DIRECT · {{ s.setLabel }}</span>
+      </div>
+      <button type="button" class="round-btn" aria-label="Annuler le dernier point" [disabled]="!canUndo()" (click)="undo()">
+        <app-icon name="undo" [size]="20" />
+      </button>
+    </div>
+
+    <div class="history">
+      @for (h of s.history; track h) {
+        <span>{{ h }}</span>
+      } @empty {
+        <span>Premier set</span>
+      }
+    </div>
+
+    @for (team of s.sides; track team.side) {
+      <section class="panel" [class.serving]="serve() === team.side && !s.over" [class.won]="team.wonSet" [attr.aria-label]="team.name">
+        <div class="panel-head">
+          <div>
+            <h2>{{ team.name }}</h2>
+            @if (!s.single) {
+              <span class="sets">Sets gagnés : {{ team.sets }}</span>
+            }
+          </div>
+          @if (serve() === team.side && !s.over) {
+            <span class="serve">Service</span>
+          }
+        </div>
+        <div class="panel-score">
+          <button type="button" class="minus" [attr.aria-label]="'Retirer un point à ' + team.name" [disabled]="s.done || team.points === 0" (click)="remove(team.side)">−</button>
+          <span class="points" aria-live="polite">{{ team.points }}</span>
+          <button type="button" class="plus" [attr.aria-label]="'Point pour ' + team.name" [disabled]="!!s.setWon || s.over || s.done" (click)="point(team.side)">+1</button>
+        </div>
+      </section>
+    }
+
+    <div class="bottom">
+      <span class="hint" role="status">{{ s.hint }}</span>
+      @if (s.done) {
+        <a class="close-btn ready" [routerLink]="backLink()">Résultat envoyé · retour aux matchs</a>
+      } @else {
+        <button type="button" class="close-btn" [class.ready]="s.setWon || s.over" [disabled]="!s.setWon && !s.over" (click)="next()">
+          {{ s.over ? 'Valider le résultat' : 'Valider le set' }}
+        </button>
+      }
+    </div>
+  } @else if (ctx.store.loaded()) {
+    <div class="missing">
+      <p>Ce match n’est pas disponible pour la saisie en direct.</p>
+      <a [routerLink]="backLink()" class="close-btn ready">Retour aux matchs</a>
+    </div>
+  }
+</main>

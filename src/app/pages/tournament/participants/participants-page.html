@@ -1,0 +1,140 @@
+<div class="layout">
+  <aside class="side-col">
+    <form class="card" (submit)="add($event)">
+      <h2 class="display display-m">Ajouter une équipe</h2>
+      @if (locked()) {
+        <p class="notice">Le tirage est validé : la liste des équipes est figée.</p>
+      }
+      <label class="field">
+        Nom de l’équipe
+        <input
+          type="text"
+          placeholder="Ex. Les Passeurs"
+          maxlength="40"
+          [value]="draft()"
+          (input)="draft.set($any($event.target).value)"
+          [disabled]="locked() || full()"
+        />
+      </label>
+      <div class="group">
+        <span class="label" id="level-label">Niveau</span>
+        <div class="segmented" role="group" aria-labelledby="level-label">
+          @for (l of levels; track l) {
+            <button type="button" [attr.aria-pressed]="level() === l" [disabled]="locked()" (click)="level.set(l)">{{ l }}</button>
+          }
+        </div>
+      </div>
+      <button type="submit" class="btn btn--primary btn--lg" [disabled]="locked() || full() || !draft().trim()">
+        <app-icon name="plus" [strokeWidth]="2.4" />
+        Ajouter
+      </button>
+      @if (full() && !locked()) {
+        <p class="small muted">Toutes les places sont prises. Augmentez « Équipes max » dans l’étape Format pour en ajouter.</p>
+      }
+
+      <div class="or"><span></span>ou<span></span></div>
+
+      <label class="btn btn--outline" [class.disabled]="locked() || full()">
+        <app-icon name="upload" [strokeWidth]="2" />
+        Importer un fichier CSV
+        <input type="file" accept=".csv,.txt,text/csv" class="visually-hidden" [disabled]="locked() || full()" (change)="importCsv($event)" />
+      </label>
+      <p class="small muted">
+        Une équipe par ligne (<code>Nom;Niveau</code>), ou la feuille d’inscription en binômes exportée en CSV.
+      </p>
+      <div class="sheet">
+        <label class="field">
+          Ou depuis une Google Sheet
+          <input
+            type="url"
+            placeholder="https://docs.google.com/spreadsheets/d/…"
+            [value]="sheetLink()"
+            (input)="sheetLink.set($any($event.target).value)"
+            (keydown.enter)="importSheet($event)"
+            [disabled]="locked() || full() || importing()"
+          />
+        </label>
+        <button type="button" class="btn btn--outline" [disabled]="locked() || full() || importing() || !sheetLink().trim()" (click)="importSheet($event)">
+          {{ importing() ? 'Import…' : 'Importer' }}
+        </button>
+      </div>
+      <p class="small muted">Feuille partagée par lien. L’onglet ouvert dans le lien (paramètre <code>gid</code>) est utilisé.</p>
+      @if (message()) {
+        <p class="small notice" role="status">{{ message() }}</p>
+      }
+      <button type="button" class="btn btn--outline" disabled title="Disponible avec le backend">
+        <app-icon name="link" [strokeWidth]="2" />
+        Partager le lien d’inscription
+      </button>
+    </form>
+  </aside>
+
+  <section class="main-col">
+    <div class="section-head">
+      <h2 class="display display-l">Équipes inscrites</h2>
+      <span class="counter"><strong>{{ count() }}</strong> / {{ max() }}</span>
+    </div>
+    <div class="progress"><span [style.width.%]="(count() / max()) * 100"></span></div>
+
+    <ul class="teams">
+      @for (team of t().teams; track team.id) {
+        <li class="team">
+          <app-team-avatar [team]="team" />
+          <div class="team-info">
+            <span class="team-name" [title]="team.name">{{ team.name }}</span>
+            @if (team.players?.length) {
+              <span class="players">
+                @for (p of team.players; track $index) {
+                  <span>{{ p.name || '?' }} <small>{{ p.category }}</small></span>
+                }
+              </span>
+            }
+            <span class="badges">
+              @if (byLevel()) {
+                <label class="rating">
+                  Niveau
+                  <select [value]="rating(team)" [disabled]="locked()" (change)="setRating(team.id, $event)" [attr.aria-label]="'Niveau de ' + team.name">
+                    @for (r of ratings; track r) {
+                      <option [value]="r" [selected]="r === rating(team)">{{ r }}</option>
+                    }
+                  </select>
+                </label>
+              } @else {
+                <span class="badge">{{ team.level }}</span>
+              }
+              @if (team.seed) {
+                <span class="badge badge--seed">Tête de série</span>
+              }
+            </span>
+          </div>
+          @if (t().format !== 'mixer') {
+          <button
+            type="button"
+            class="icon-btn"
+            [class.on]="team.seed"
+            [attr.aria-pressed]="team.seed"
+            [attr.aria-label]="'Tête de série : ' + team.name"
+            [disabled]="locked()"
+            (click)="toggleSeed(team.id)"
+          >
+            <app-icon name="star" [size]="20" [strokeWidth]="2" [filled]="team.seed" />
+          </button>
+          }
+          <button type="button" class="icon-btn" [attr.aria-label]="'Retirer ' + team.name" [disabled]="locked()" (click)="remove(team.id)">
+            <app-icon name="close" [strokeWidth]="2" />
+          </button>
+        </li>
+      } @empty {
+        <li class="empty muted">Aucune équipe pour l’instant.</li>
+      }
+    </ul>
+
+    <div class="next">
+      <span>{{ seedHint() }}</span>
+      <a routerLink="../tirage" class="btn btn--primary">
+        {{ locked() ? 'Voir le tirage' : 'Passer au tirage' }}
+        <app-icon name="arrow-right" [strokeWidth]="2.4" />
+      </a>
+    </div>
+  </section>
+</div>

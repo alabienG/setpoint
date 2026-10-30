@@ -1,0 +1,146 @@
+.info {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.format {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 200px;
+  padding: 20px;
+  text-align: left;
+  border-radius: 16px;
+  background: #fff;
+  border: 2px solid var(--line);
+  cursor: pointer;
+
+  &.selected {
+    background: var(--orange-tint);
+    border-color: var(--orange);
+    box-shadow: 0 6px 18px rgba(194, 65, 12, 0.14);
+  }
+  &:disabled {
+    cursor: not-allowed;
+  }
+  &:disabled:not(.selected) {
+    opacity: 0.6;
+  }
+  &:hover:not(:disabled):not(.selected) {
+    border-color: var(--line-strong);
+  }
+}
+.format-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+.format-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+.format-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.format-estimate {
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.settings {
+  gap: 20px;
+}
+.chosen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chosen-name {
+  font-size: 30px;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  .label {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .segmented button {
+    flex: 1 1 0;
+  }
+}
+.pools {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.phases {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.phases-intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.phase {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  legend {
+    padding: 0 6px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .field {
+    font-size: 13px;
+  }
+}
+.points {
+  padding: 14px;
+  background: var(--bg);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  span {
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+}
+.danger {
+  color: #b91c1c;
+  &:hover {
+    color: #991b1b;
+    border-color: #b91c1c;
+  }
+}
+
+@media (max-width: 640px) {
+  .info {
+    grid-template-columns: 1fr 1fr;
+    .name {
+      grid-column: 1 / -1;
+    }
+  }
+}

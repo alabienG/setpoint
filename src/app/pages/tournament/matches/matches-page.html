@@ -1,0 +1,204 @@
+@if (t().stage === 'setup') {
+  <div class="card">
+    <h2 class="display display-l">Pas encore de matchs</h2>
+    <p class="muted">Les rencontres sont générées quand le tirage est validé.</p>
+    <a routerLink="../tirage" class="btn btn--primary">Aller au tirage</a>
+  </div>
+} @else {
+  @if (nextStep(); as step) {
+    <div class="finals-banner">
+      <div>
+        <strong>{{ step.title }}</strong>
+        <span>{{ step.text }}</span>
+      </div>
+      <button type="button" class="btn btn--primary btn--lg" (click)="advance()">{{ step.action }}</button>
+    </div>
+  }
+  @if (t().stage === 'finished') {
+    <div class="finals-banner">
+      <div>
+        <strong>Tournoi terminé</strong>
+        <span>Tous les matchs ont été joués.</span>
+      </div>
+      <a routerLink="../resultats" class="btn btn--light btn--lg">Voir les résultats</a>
+    </div>
+  }
+
+  <div class="split">
+    <section class="main">
+      <div class="section-head">
+        <h2 class="display display-l">Matchs <span class="subtle">· {{ progress().done }} / {{ progress().total }} joués</span></h2>
+        <div class="segmented" role="group" aria-label="Filtrer les matchs">
+          @for (f of filters; track f.id) {
+            <button type="button" [attr.aria-pressed]="filter() === f.id" (click)="filter.set(f.id)">{{ f.label }}</button>
+          }
+        </div>
+      </div>
+
+      @for (g of groups(); track g.key) {
+        @if (groups().length > 1) {
+          <details class="phase" [open]="g.open" (toggle)="toggleGroup(g.key, $event)">
+            <summary>
+              <span class="chevron" aria-hidden="true"></span>
+              <span class="display phase-title">{{ g.title }}</span>
+              <span class="phase-meta">{{ g.done }} / {{ g.total }} joués</span>
+              @if (g.done === g.total) {
+                <span class="pill pill--neutral">Terminée</span>
+              } @else if (g.done > 0) {
+                <span class="pill pill--live">En cours</span>
+              }
+            </summary>
+            <ng-container *ngTemplateOutlet="matchGrid; context: { $implicit: g.cards }" />
+          </details>
+        } @else {
+          <ng-container *ngTemplateOutlet="matchGrid; context: { $implicit: g.cards }" />
+        }
+      }
+    </section>
+
+    <ng-template #matchGrid let-cards>
+      <div class="grid">
+        @for (c of $any(cards); track c.m.id) {
+          <button type="button" class="match" [class.selected]="c.selected" [attr.aria-pressed]="c.selected" (click)="select(c.m.id)">
+            <span class="meta">
+              <span class="where"><span [class]="tagClass(c.m)">{{ c.tag }}</span>{{ c.time }} · Terrain {{ c.m.court }}</span>
+              <span class="pill status" [class]="'status--' + c.m.status">{{ statusLabels[c.m.status] }}</span>
+            </span>
+            <span class="line">
+              <span class="name" [class.win]="c.winner === 'a'">{{ c.a }}</span>
+              <span class="sets">{{ c.setsA }}</span>
+            </span>
+            <span class="line">
+              <span class="name" [class.win]="c.winner === 'b'">{{ c.b }}</span>
+              <span class="sets">{{ c.setsB }}</span>
+            </span>
+            <span class="detail num">{{ c.detail }}</span>
+          </button>
+        } @empty {
+          <p class="muted">Aucun match dans cette catégorie.</p>
+        }
+      </div>
+    </ng-template>
+
+    <aside class="side">
+      @if (entry(); as e) {
+        <div class="card card--dark entry">
+          <div class="entry-head">
+            <span class="eyebrow">Saisie du score</span>
+            <span>{{ e.tag }} · Terrain {{ e.m.court }}</span>
+          </div>
+          <span class="rules">{{ e.rules }}</span>
+
+          <div class="score-grid">
+            <span class="col-label">Set</span>
+            <span class="team-label" [title]="e.short('a')">{{ e.short('a') }}</span>
+            <span class="team-label" [title]="e.short('b')">{{ e.short('b') }}</span>
+            @for (s of e.sets; track s.index) {
+              <span class="set-label">{{ s.label }}</span>
+              <input
+                type="number"
+                min="0"
+                max="99"
+                inputmode="numeric"
+                [class.won]="s.winner === 'a'"
+                [value]="s.a ?? ''"
+                [disabled]="s.disabled"
+                [attr.aria-label]="s.label + ' — ' + e.short('a')"
+                (change)="setScore(e.m, s.index, 'a', $event)"
+              />
+              <input
+                type="number"
+                min="0"
+                max="99"
+                inputmode="numeric"
+                [class.won]="s.winner === 'b'"
+                [value]="s.b ?? ''"
+                [disabled]="s.disabled"
+                [attr.aria-label]="s.label + ' — ' + e.short('b')"
+                (change)="setScore(e.m, s.index, 'b', $event)"
+              />
+            }
+          </div>
+
+          <div class="verdict">
+            <app-icon name="trophy" [size]="24" [strokeWidth]="2" />
+            <div>
+              @if (e.sets.length > 1) {
+                <span class="verdict-sets">Sets {{ e.result.setsA }} – {{ e.result.setsB }}</span>
+              }
+              <strong>{{ e.verdict }}</strong>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn--lg validate" [class.ready]="e.canValidate" [disabled]="!e.canValidate" (click)="validate(e.m)">
+            {{ e.m.status === 'done' ? 'Résultat validé' : 'Valider le résultat' }}
+          </button>
+          @if (e.ready && e.m.status !== 'done') {
+            <a class="mobile-link" [routerLink]="[e.m.id, 'direct']">
+              <app-icon name="phone" [size]="16" [strokeWidth]="2" />
+              Ouvrir la saisie en direct sur mobile
+            </a>
+          }
+        </div>
+      }
+
+      @if (table(); as tb) {
+        <div class="card standings">
+          @let singleSet = t().format === 'mixer' || t().settings.setsToWin === 1;
+          <h3 class="display display-m">
+            {{ tb.title }}
+            @if (tb.subtitle) {
+              <span class="subtle">· {{ tb.subtitle }}</span>
+            }
+          </h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="left" scope="col">Équipe</th>
+                  <th scope="col"><abbr title="Joués">J</abbr></th>
+                  <th scope="col"><abbr title="Victoires">V</abbr></th>
+                  @if (t().format === 'mixer') {
+                    <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
+                    <th scope="col"><abbr title="Points marqués (critère de classement)">Pts</abbr></th>
+                  } @else if (singleSet) {
+                    <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
+                    <th scope="col"><abbr title="Points marqués">Pts +</abbr></th>
+                  } @else {
+                    <th scope="col">Sets</th>
+                    <th scope="col">Pts</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of tb.rows; track r.teamId; let i = $index) {
+                  <tr>
+                    <td class="left">
+                      <span class="team-cell">
+                        <span class="rank" [class.rank--top]="i < tb.qualified">{{ i + 1 }}</span>
+                        <strong>{{ ctx.teamName(r.teamId) }}</strong>
+                      </span>
+                    </td>
+                    <td>{{ r.played }}</td>
+                    <td>{{ r.wins }}</td>
+                    @if (t().format === 'mixer') {
+                      <td class="muted">{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</td>
+                      <td><strong>{{ r.pointsFor }}</strong></td>
+                    } @else if (singleSet) {
+                      <td><strong>{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</strong></td>
+                      <td class="muted">{{ r.pointsFor }}</td>
+                    } @else {
+                      <td class="muted">{{ r.setsWon }}-{{ r.setsLost }}</td>
+                      <td><strong>{{ r.rankingPoints }}</strong></td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <span class="note muted">{{ tb.note }}</span>
+        </div>
+      }
+    </aside>
+  </div>
+}

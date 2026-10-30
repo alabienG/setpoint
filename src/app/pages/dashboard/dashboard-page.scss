@@ -1,0 +1,209 @@
+.dashboard {
+  gap: 32px;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 20px;
+  padding: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: center;
+  justify-content: space-between;
+
+  .court {
+    position: absolute;
+    right: -40px;
+    top: -20px;
+    opacity: 0.18;
+  }
+  .hero-text {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 620px;
+  }
+  .eyebrow {
+    color: var(--orange-bright);
+    letter-spacing: 1.5px;
+  }
+  h1 {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  p {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--on-navy-muted);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    span {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+    }
+  }
+  .btn {
+    position: relative;
+  }
+}
+
+.small {
+  font-size: 13px;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.tournament {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+    box-shadow: 0 6px 18px rgba(14, 23, 38, 0.06);
+  }
+  h3 {
+    margin: 0 0 4px;
+    font-size: 19px;
+    font-weight: 700;
+  }
+  p {
+    margin: 0;
+    font-size: 14px;
+  }
+  .meter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    strong {
+      color: var(--ink);
+    }
+  }
+  .winner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 10px;
+    font-size: 14px;
+    app-icon {
+      color: var(--orange);
+    }
+  }
+}
+
+.tournament.add {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  background: transparent;
+  border: 2px dashed var(--line-strong);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  .plus {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--orange-soft);
+    color: var(--orange);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.empty {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  p {
+    margin: 0;
+    flex: 1 1 280px;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+}
+
+.live-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--orange);
+  }
+}
+
+.live {
+  padding: 20px;
+  gap: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  &:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+  .set {
+    color: var(--orange-dark);
+  }
+  .team {
+    font-weight: 600;
+  }
+  .scores {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .big {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    &.lead {
+      color: var(--orange);
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 28px 20px;
+    h1 {
+      font-size: 40px;
+    }
+  }
+}

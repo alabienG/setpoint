@@ -1,0 +1,90 @@
+name: Déploiement GitHub Pages
+
+# Teste, construit et publie le front des compétitions sur GitHub Pages
+# à chaque push sur main (ou à la demande depuis l'onglet Actions).
+#
+# Variables du dépôt (Settings → Secrets and variables → Actions → Variables) :
+#   API_BASE_URL : adresse de l'API Bon-Coach, sans /api ni / final
+#                  (ex. https://<domaine>/boncoach). Obligatoire, et en HTTPS : une page
+#                  GitHub Pages ne peut pas appeler une API en HTTP.
+#   BASE_HREF    : (optionnel) chemin de publication. Par défaut /<nom du dépôt>/ ;
+#                  mettre / pour un domaine personnalisé ou un dépôt <compte>.github.io.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Tests & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        run: npm ci
+
+      - name: Tests
+        run: npx ng test --watch=false
+
+      - name: Configuration de l'API
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::error::La variable de dépôt API_BASE_URL n'est pas définie."
+            exit 1
+          fi
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::warning::API_BASE_URL n'est pas en HTTPS : le navigateur bloquera les appels depuis GitHub Pages." ;;
+          esac
+          cat > src/environments/environment.ts <<EOF
+          export const environment = {
+            apiBaseUrl: '${API_BASE_URL%/}',
+          };
+          EOF
+
+      - name: Build
+        env:
+          BASE_HREF: ${{ vars.BASE_HREF || format('/{0}/', github.event.repository.name) }}
+        run: |
+          npx ng build --base-href "$BASE_HREF"
+          # GitHub Pages ne connaît pas les routes de l'application : une adresse
+          # comme /<dépôt>/tournoi-d-automne-x7k2 renvoie 404.html, qui est donc
+          # une copie de l'application.
+          cp dist/setpoint/browser/index.html dist/setpoint/browser/404.html
+
+      - name: Publication de l'artefact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/setpoint/browser
+
+  deploy:
+    name: Déploiement
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Déploiement sur GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

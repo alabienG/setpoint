@@ -1,0 +1,132 @@
+<main class="page dashboard">
+  <section class="hero">
+    <svg class="court" width="560" height="320" viewBox="0 0 560 320" fill="none" stroke="#FB7A3C" stroke-width="3" aria-hidden="true">
+      <rect x="20" y="20" width="520" height="280" />
+      <line x1="280" y1="20" x2="280" y2="300" />
+      <line x1="190" y1="20" x2="190" y2="300" />
+      <line x1="370" y1="20" x2="370" y2="300" />
+    </svg>
+    <div class="hero-text">
+      <span class="eyebrow">Organisateur</span>
+      <h1 class="display">Votre prochain tournoi,<br />prêt en 4 étapes</h1>
+      <p>Choisissez un format, inscrivez les équipes, lancez le tirage et suivez les scores en direct jusqu’au podium.</p>
+      <div class="chips">
+        <span>1 · Format</span>
+        <span>2 · Participants</span>
+        <span>3 · Tirage</span>
+        <span>4 · Scores</span>
+      </div>
+    </div>
+    <a routerLink="/organisateur/nouveau" class="btn btn--light btn--lg">
+      Créer un tournoi
+      <app-icon name="arrow-right" [strokeWidth]="2.4" />
+    </a>
+  </section>
+
+  <div class="split">
+    <section class="main">
+      <div class="section-head">
+        <h2 class="display display-l">Mes tournois</h2>
+        <div class="segmented" role="group" aria-label="Filtrer les tournois">
+          @for (f of filters; track f.id) {
+            <button type="button" [attr.aria-pressed]="filter() === f.id" (click)="filter.set(f.id)">{{ f.label }}</button>
+          }
+        </div>
+      </div>
+
+      @if (loaded() && !hasTournaments()) {
+        <div class="card empty">
+          <p>Aucun tournoi pour l’instant. Créez votre premier tournoi pour commencer.</p>
+          @if (devMode) {
+            <button type="button" class="btn btn--outline" (click)="loadDemo()">Charger un tournoi d’exemple</button>
+          }
+        </div>
+      }
+
+      <div class="grid">
+        @for (c of cards(); track c.t.id) {
+          <a class="tournament" [routerLink]="c.link">
+            <div class="row">
+              @switch (c.t.stage) {
+                @case ('setup') { <span class="pill pill--info">Inscriptions ouvertes</span> }
+                @case ('running') { <span class="pill pill--live">En cours</span> }
+                @case ('finished') { <span class="pill pill--neutral">Terminé</span> }
+              }
+              <span class="small muted">
+                @if (c.t.date) {
+                  {{ c.t.date | date: 'd MMM y' }}
+                } @else {
+                  Date à définir
+                }
+              </span>
+            </div>
+            <div>
+              <h3>{{ c.t.name }}</h3>
+              <p class="small muted">
+                {{ c.format }} ·
+                @if (c.t.stage === 'setup') {
+                  {{ c.t.settings.maxTeams }} places
+                } @else {
+                  {{ c.t.teams.length }} équipes
+                }
+              </p>
+            </div>
+            @if (c.t.stage === 'finished') {
+              <div class="winner">
+                <app-icon name="trophy" [size]="22" [strokeWidth]="2" />
+                <span>Vainqueur : <strong>{{ c.winner }}</strong></span>
+              </div>
+            } @else {
+              <div class="meter">
+                <div class="row small muted">
+                  @if (c.t.stage === 'setup') {
+                    <span>Équipes inscrites</span>
+                    <strong class="num">{{ c.t.teams.length }} / {{ c.t.settings.maxTeams }}</strong>
+                  } @else {
+                    <span>Matchs joués</span>
+                    <strong class="num">{{ c.done }} / {{ c.total }}</strong>
+                  }
+                </div>
+                <div class="progress" [class.progress--blue]="c.t.stage === 'setup'">
+                  <span [style.width.%]="c.percent"></span>
+                </div>
+              </div>
+            }
+          </a>
+        }
+        <a routerLink="/organisateur/nouveau" class="tournament add">
+          <span class="plus"><app-icon name="plus" [size]="22" [strokeWidth]="2.4" /></span>
+          Nouveau tournoi
+        </a>
+      </div>
+    </section>
+
+    <aside class="side">
+      <h2 class="display display-l live-title"><span class="dot" aria-hidden="true"></span>En direct</h2>
+      @for (m of live(); track m.key) {
+        <a class="card live" [routerLink]="m.link">
+          <div class="row small muted">
+            <span>{{ m.where }}</span>
+            <strong class="set">{{ m.setLabel }}</strong>
+          </div>
+          @for (r of m.rows; track $index) {
+            <div class="row">
+              <span class="team">{{ r.name }}</span>
+              <span class="scores num">
+                @for (p of r.previous; track $index) {
+                  <span class="muted">{{ p ?? 0 }}</span>
+                }
+                <span class="big" [class.lead]="r.leading">{{ r.current ?? 0 }}</span>
+              </span>
+            </div>
+          }
+        </a>
+      } @empty {
+        <div class="card"><p class="muted small">Aucun match en cours.</p></div>
+      }
+      @if (firstLiveLink(); as link) {
+        <a class="btn btn--outline" [routerLink]="link">Voir tous les matchs</a>
+      }
+    </aside>
+  </div>
+</main>

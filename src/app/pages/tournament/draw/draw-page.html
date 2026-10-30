@@ -1,0 +1,147 @@
+@let tournament = t();
+@if (locked()) {
+  <section class="bar">
+    <p class="locked-text">
+      <app-icon name="check" [strokeWidth]="2.6" />
+      Tirage validé. Les rencontres sont figées.
+    </p>
+    <a routerLink="../matchs" class="btn btn--primary btn--lg">Aller aux matchs</a>
+  </section>
+} @else {
+  <section class="bar">
+    @if (tournament.format !== 'league') {
+      <div class="mode">
+        <span class="label" id="mode-label">Méthode de tirage</span>
+        <div class="segmented" role="group" aria-labelledby="mode-label">
+          @for (m of modes(); track m.id) {
+            <button type="button" [attr.aria-pressed]="tournament.drawMode === m.id" (click)="setMode(m.id)">{{ m.label }}</button>
+          }
+        </div>
+      </div>
+    } @else {
+      <p class="muted">Championnat : toutes les équipes se rencontrent, le tirage fixe l’ordre des journées.</p>
+    }
+    <div class="actions">
+      <button type="button" class="btn btn--dark btn--lg" (click)="redraw()" [disabled]="blockers().length > 0">
+        <app-icon name="shuffle" [size]="20" class="accent" />
+        Relancer le tirage
+      </button>
+      <button type="button" class="btn btn--primary btn--lg" (click)="validate()" [disabled]="blockers().length > 0">Valider le tirage</button>
+    </div>
+  </section>
+}
+
+@if (blockers().length) {
+  <div class="notice notice--warn" role="alert">
+    <strong>Le tirage ne peut pas encore être fait :</strong>
+    <ul>
+      @for (b of blockers(); track b) {
+        <li>{{ b }}</li>
+      }
+    </ul>
+    <a routerLink="../participants">Gérer les participants</a> · <a routerLink="../format">Modifier le format</a>
+  </div>
+}
+
+@if (draw(); as d) {
+  <div class="layout">
+    <section class="col">
+      @let mixer = tournament.format === 'mixer';
+      @switch (mixer ? 'pools' : tournament.format) {
+        @case ('pools') {
+          <h2 class="display display-l">
+            Composition des poules
+            @if (!locked()) {
+              <span class="subtle">· tirage n°{{ tournament.drawRound }}</span>
+            }
+          </h2>
+          <div class="pools">
+            @for (p of pools(); track p.letter) {
+              <div class="pool">
+                <div class="pool-head" [class]="poolTagClass(p.letter)">
+                  <span class="display pool-name">Poule {{ p.letter }}</span>
+                  <span class="pool-meta">
+                    @if (mixer) {
+                      Niveau moyen {{ averageRating(p.teamIds) }} ·
+                    }
+                    {{ p.teamIds.length }} équipes · {{ (p.teamIds.length * (p.teamIds.length - 1)) / 2 }} matchs
+                  </span>
+                </div>
+                <ol>
+                  @for (id of p.teamIds; track id; let i = $index) {
+                    @let team = ctx.teamsById().get(id);
+                    <li>
+                      <span class="slot">{{ mixer ? 'ABCD'[i] : p.letter + (i + 1) }}</span>
+                      <span class="team">{{ team?.name }}</span>
+                      @if (team?.seed && tournament.drawMode !== 'random') {
+                        <span class="star" role="img" aria-label="Tête de série"><app-icon name="star" [filled]="true" [strokeWidth]="2" /></span>
+                      }
+                    </li>
+                  }
+                </ol>
+              </div>
+            }
+          </div>
+          <p class="muted small">
+            @if (mixer) {
+              Phase 1. Les poules sont rebrassées selon les résultats à l’issue de chaque phase : principale et consolante en phase 2, poules de classement en phase 3.
+            } @else {
+              Les {{ tournament.settings.qualifiersPerPool }} premiers de chaque poule se qualifient. La phase finale sera générée à l’issue des poules.
+            }
+          </p>
+        }
+        @case ('elim') {
+          <h2 class="display display-l">Premier tour</h2>
+          <div class="pairs">
+            @for (m of firstRound(); track m.id) {
+              <div class="pair">
+                <span class="tag tag--bracket">{{ m.label }}</span>
+                <span><strong>{{ name(m, 'a') }}</strong> <span class="muted">vs</span> <strong>{{ name(m, 'b') }}</strong></span>
+                @if (m.bye) {
+                  <span class="pill pill--neutral">Qualifiée d’office</span>
+                }
+              </div>
+            }
+          </div>
+        }
+        @case ('league') {
+          <h2 class="display display-l">Équipes engagées</h2>
+          <div class="pool">
+            <div class="pool-head tag--0">
+              <span class="display pool-name">Championnat</span>
+              <span class="pool-meta">{{ tournament.teams.length }} équipes · {{ leagueRounds() }} journées</span>
+            </div>
+            <ol>
+              @for (team of tournament.teams; track team.id; let i = $index) {
+                <li>
+                  <span class="slot">{{ i + 1 }}</span>
+                  <span class="team">{{ team.name }}</span>
+                </li>
+              }
+            </ol>
+          </div>
+        }
+      }
+    </section>
+
+    <section class="col">
+      <h2 class="display display-l">Rencontres générées</h2>
+      <div class="schedule">
+        @for (s of slots(); track s.slot) {
+          <div class="slot-row">
+            <span class="time">{{ s.time }}</span>
+            <div class="games">
+              @for (g of s.games; track g.id) {
+                <div class="game">
+                  <span [class]="tagClass(g)">{{ g.phase === 'pool' ? g.pool : g.label }}</span>
+                  <span class="vs"><strong>{{ name(g, 'a') }}</strong> <span class="muted">vs</span> <strong>{{ name(g, 'b') }}</strong></span>
+                  <span class="court">Terrain {{ g.court }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+}

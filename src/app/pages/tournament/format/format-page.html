@@ -1,0 +1,169 @@
+@let s = t().settings;
+<div class="split">
+  <section class="main">
+    <div class="card info">
+      <label class="field name">
+        Nom du tournoi
+        <input type="text" [value]="t().name" (input)="rename($event)" maxlength="80" />
+      </label>
+      <label class="field">
+        Date
+        <input type="date" [value]="t().date ?? ''" (change)="setDate($event)" />
+      </label>
+      <label class="field">
+        Premier match
+        <input type="time" [value]="s.startTime" (change)="setStartTime($event)" [disabled]="locked()" />
+      </label>
+    </div>
+
+    @if (locked()) {
+      <p class="notice">Le tirage a été validé : le format et les règles ne peuvent plus être modifiés.</p>
+    }
+
+    <h2 class="display display-l">Choisissez un format</h2>
+    <div class="formats">
+      @for (f of formats(); track f.id) {
+        <button
+          type="button"
+          class="format"
+          [class.selected]="t().format === f.id"
+          [attr.aria-pressed]="t().format === f.id"
+          [disabled]="locked() || !f.available"
+          (click)="pick(f.id)"
+        >
+          <span class="format-head">
+            <app-format-icon [format]="f.id" />
+            @if (!f.available) {
+              <span class="pill pill--neutral">Bientôt</span>
+            } @else if (f.recommended) {
+              <span class="pill pill--accent">Recommandé</span>
+            }
+          </span>
+          <span class="format-name">{{ f.name }}</span>
+          <span class="format-desc">{{ f.description }}</span>
+          <span class="format-estimate">{{ f.estimate }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card settings">
+      <div class="chosen">
+        <span class="eyebrow">Format choisi</span>
+        <span class="display chosen-name">{{ selectedName() }}</span>
+      </div>
+
+      @if (mixer()) {
+        <div class="phases">
+          <p class="phases-intro">
+            De {{ mixerMin }} à {{ mixerMax }} équipes, en poules de 4 (ou de 3 s’il en manque) :
+            <strong>{{ mixerLayout() }}</strong>.
+            @if (mixerPools() === 3) {
+              Phase 1 : poules de niveau homogène. Phase 2 : poules par rang (principale, intermédiaire, consolante).
+              Phase 3 : montée / descente, poules de classement.
+            } @else {
+              Phase 1 : poules de niveau homogène. Phase 2 : principale (2 premiers) et consolante. Phase 3 : poules
+              de classement (places 1-4, 5-8…).
+            }
+          </p>
+          @for (p of s.phases; track $index; let i = $index) {
+            <fieldset class="phase">
+              <legend>Phase {{ i + 1 }}</legend>
+              <label class="field">
+                Points
+                <input type="number" min="5" max="50" [value]="p.pointsPerSet" [disabled]="locked()" (change)="setPhasePoints(i, $event)" />
+              </label>
+              <label class="field">
+                Plafond
+                <input type="number" min="0" max="60" placeholder="Aucun" [value]="p.cap ?? ''" [disabled]="locked()" (change)="setPhaseCap(i, $event)" />
+              </label>
+              <label class="field">
+                Durée (min)
+                <input type="number" min="5" max="120" [value]="p.minutes" [disabled]="locked()" (change)="setPhaseMinutes(i, $event)" />
+              </label>
+            </fieldset>
+          }
+        </div>
+        <div class="fields">
+          <label class="field">
+            Terrains
+            <input type="number" min="1" max="20" [value]="s.courts" [disabled]="locked()" (change)="setNumber('courts', $event, 1, 20)" />
+          </label>
+          <label class="field">
+            Équipes max
+            <input type="number" [min]="mixerMinMax()" [max]="mixerMax" [value]="s.maxTeams" [disabled]="locked()" (change)="setNumber('maxTeams', $event, mixerMinMax(), mixerMax)" />
+          </label>
+        </div>
+      } @else {
+        <div class="group">
+          <span class="label" id="sets-label">Sets gagnants par match</span>
+          <div class="segmented" role="group" aria-labelledby="sets-label">
+            <button type="button" [attr.aria-pressed]="s.setsToWin === 1" [disabled]="locked()" (click)="setSets(1)">1 set</button>
+            <button type="button" [attr.aria-pressed]="s.setsToWin === 2" [disabled]="locked()" (click)="setSets(2)">2 sets (Bo3)</button>
+            <button type="button" [attr.aria-pressed]="s.setsToWin === 3" [disabled]="locked()" (click)="setSets(3)">3 sets (Bo5)</button>
+          </div>
+        </div>
+
+        <div class="fields">
+          <label class="field">
+            Points par set
+            <input type="number" min="5" max="50" [value]="s.pointsPerSet" [disabled]="locked()" (change)="setNumber('pointsPerSet', $event, 5, 50)" />
+          </label>
+          @if (s.setsToWin > 1) {
+            <label class="field">
+              Set décisif
+              <input type="number" min="5" max="50" [value]="s.decidingSetPoints" [disabled]="locked()" (change)="setNumber('decidingSetPoints', $event, 5, 50)" />
+            </label>
+          }
+          <label class="field">
+            Plafond
+            <input type="number" min="0" max="60" placeholder="Aucun" [value]="s.cap ?? ''" [disabled]="locked()" (change)="setCap($event)" />
+          </label>
+          <label class="field">
+            Terrains
+            <input type="number" min="1" max="20" [value]="s.courts" [disabled]="locked()" (change)="setNumber('courts', $event, 1, 20)" />
+          </label>
+          <label class="field">
+            Équipes max
+            <input type="number" [min]="minTeams()" max="64" [value]="s.maxTeams" [disabled]="locked()" (change)="setNumber('maxTeams', $event, minTeams(), 64)" />
+          </label>
+        </div>
+      }
+
+      @if (t().format === 'pools') {
+        <div class="fields pools">
+          <label class="field">
+            Nombre de poules
+            <input type="number" min="1" max="8" [value]="s.poolCount" [disabled]="locked()" (change)="setNumber('poolCount', $event, 1, 8)" />
+          </label>
+          <label class="field">
+            Qualifiés / poule
+            <input type="number" min="1" max="8" [value]="s.qualifiersPerPool" [disabled]="locked()" (change)="setNumber('qualifiersPerPool', $event, 1, 8)" />
+          </label>
+        </div>
+      }
+
+      <div class="points">
+        <strong>Classement</strong>
+        @if (mixer()) {
+          <span>Au total de points marqués dans la poule. En cas d’égalité, la confrontation directe départage.</span>
+        } @else if (s.setsToWin === 1) {
+          <span>Victoires, puis écart de points, puis points marqués, puis confrontation directe.</span>
+        } @else {
+          <span>Victoire nette : 3 pts · Victoire au set décisif : 2 pts · Défaite au set décisif : 1 pt</span>
+        }
+      </div>
+
+      <a routerLink="../participants" class="btn btn--primary btn--lg">
+        Continuer vers les participants
+        <app-icon name="arrow-right" [strokeWidth]="2.4" />
+      </a>
+    </div>
+
+    <button type="button" class="btn btn--outline danger" (click)="remove()">
+      <app-icon name="trash" [size]="16" [strokeWidth]="2" />
+      Supprimer le tournoi
+    </button>
+  </aside>
+</div>

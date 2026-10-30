@@ -1,0 +1,199 @@
+@if (t(); as c) {
+  <main class="page">
+    <div class="heading">
+      <a routerLink="/" class="crumbs">← Toutes les compétitions</a>
+      <div class="title-row">
+        <h1 class="display display-xl">{{ c.name }}</h1>
+        @switch (c.stage) {
+          @case ('running') { <span class="pill pill--live">En cours</span> }
+          @case ('finished') { <span class="pill pill--neutral">Terminé</span> }
+          @default { <span class="pill pill--info">À venir</span> }
+        }
+      </div>
+      <p class="muted meta">
+        {{ formatLabel() }} · {{ c.teams.length }} équipes
+        @if (c.date) {
+          · {{ c.date | date: 'EEEE d MMMM y' : '' : 'fr' }}
+        }
+        @if (c.stage !== 'setup') {
+          · {{ progress().done }} / {{ progress().total }} matchs joués
+        }
+      </p>
+    </div>
+
+    @if (c.stage === 'setup') {
+      <section class="card">
+        <h2 class="display display-l">Équipes inscrites</h2>
+        <p class="muted">Le tirage n’a pas encore eu lieu. Les matchs apparaîtront ici dès qu’il sera fait.</p>
+        <ul class="teams">
+          @for (team of c.teams; track team.id) {
+            <li>
+              <app-team-avatar [team]="team" [size]="36" />
+              <span>{{ team.name }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    } @else {
+      <div class="segmented tabs" role="tablist" aria-label="Sections">
+        @for (item of tabs; track item.id) {
+          <button type="button" role="tab" [attr.aria-selected]="tab() === item.id" [attr.aria-pressed]="tab() === item.id" (click)="selectTab(item.id)">
+            {{ item.label }}
+          </button>
+        }
+      </div>
+
+      @switch (tab()) {
+        @case ('matches') {
+          @if (live().length) {
+            <section class="live">
+              <h2 class="display display-m"><span class="dot" aria-hidden="true"></span>En direct</h2>
+              <div class="grid">
+                @for (card of live(); track card.m.id) {
+                  <ng-container *ngTemplateOutlet="matchCard; context: { $implicit: card }" />
+                }
+              </div>
+            </section>
+          }
+          @for (g of groups(); track g.key) {
+            <details class="phase" [open]="g.open">
+              <summary>
+                <span class="chevron" aria-hidden="true"></span>
+                <span class="display phase-title">{{ g.title }}</span>
+              </summary>
+              <div class="grid">
+                @for (card of g.cards; track card.m.id) {
+                  <ng-container *ngTemplateOutlet="matchCard; context: { $implicit: card }" />
+                }
+              </div>
+            </details>
+          }
+        }
+
+        @case ('standings') {
+          @for (s of standings(); track s.key) {
+            <details class="phase" [open]="s.open">
+              <summary>
+                <span class="chevron" aria-hidden="true"></span>
+                <span class="display phase-title">{{ s.title }}</span>
+              </summary>
+              <div class="pools">
+                @for (p of s.pools; track $index) {
+                  <div class="card pool">
+                    @if (p.title) {
+                      <h3 class="display display-m">{{ p.title }}</h3>
+                    }
+                    <div class="table-wrap">
+                      <table class="table">
+                        <thead>
+                          <tr>
+                            <th class="left" scope="col">Équipe</th>
+                            <th scope="col"><abbr title="Joués">J</abbr></th>
+                            <th scope="col"><abbr title="Victoires">V</abbr></th>
+                            <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
+                            <th scope="col">{{ pointsOnly() ? 'Pts' : 'Pts cl.' }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (r of p.rows; track r.teamId) {
+                            <tr>
+                              <td class="left">
+                                <span class="team-cell"><span class="rank">{{ r.rank }}</span><strong>{{ r.name }}</strong></span>
+                              </td>
+                              <td>{{ r.played }}</td>
+                              <td>{{ r.wins }}</td>
+                              <td class="muted">{{ r.diff > 0 ? '+' : '' }}{{ r.diff }}</td>
+                              <td><strong>{{ pointsOnly() ? r.pointsFor : r.rankingPoints }}</strong></td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+              </div>
+            </details>
+          } @empty {
+            <p class="muted">Les classements apparaîtront après les premiers matchs.</p>
+          }
+        }
+
+        @case ('results') {
+          @if (podium().length) {
+            <section class="podium-card">
+              <h2 class="display">Podium</h2>
+              <div class="podium">
+                @for (p of podium(); track p.place) {
+                  <div class="step" [class]="'step--' + p.place">
+                    <app-team-avatar [team]="p.row.team" [size]="p.place === 1 ? 64 : 52" />
+                    <span class="podium-name">{{ p.row.team.name }}</span>
+                    <div class="block">{{ p.place }}</div>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+          <section class="card">
+            <h2 class="display display-l">{{ c.stage === 'finished' ? 'Classement final' : 'Classement provisoire' }}</h2>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th class="left" scope="col">Rang</th>
+                    <th class="left" scope="col">Équipe</th>
+                    <th scope="col">Matchs</th>
+                    <th scope="col">Victoires</th>
+                    <th scope="col">Pts marqués</th>
+                    <th class="left" scope="col">Parcours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of ranking(); track r.teamId) {
+                    <tr>
+                      <td class="left"><span class="rank" [class.rank--top]="r.rank <= 3 && c.stage === 'finished'">{{ r.rank }}</span></td>
+                      <td class="left"><strong>{{ r.team.name }}</strong></td>
+                      <td>{{ r.played }}</td>
+                      <td>{{ r.wins }}</td>
+                      <td>{{ r.pointsFor }}</td>
+                      <td class="left muted">{{ r.journey }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+      }
+    }
+
+    @if (updatedAt(); as at) {
+      <p class="updated muted">Mis à jour à {{ at | date: 'HH:mm:ss' }} · actualisation automatique</p>
+    }
+  </main>
+} @else if (notFound()) {
+  <main class="page">
+    <div class="card">
+      <h1 class="display display-l">Compétition introuvable</h1>
+      <a routerLink="/">Voir toutes les compétitions</a>
+    </div>
+  </main>
+}
+
+<ng-template #matchCard let-card>
+  @let c = $any(card);
+  <article class="match" [class.is-live]="c.m.status === 'live'">
+    <span class="match-meta">
+      <span class="where"><span [class]="tagClass(c.m)">{{ c.tag }}</span>{{ c.time }} · Terrain {{ c.m.court }}</span>
+      @if (c.m.status === 'live') {
+        <span class="pill pill--live-strong">En direct</span>
+      } @else if (c.m.status === 'done') {
+        <span class="pill pill--neutral">Terminé</span>
+      }
+    </span>
+    <span class="line"><span class="name" [class.win]="c.winner === 'a'">{{ c.a }}</span><span class="score">{{ c.scoreA }}</span></span>
+    <span class="line"><span class="name" [class.win]="c.winner === 'b'">{{ c.b }}</span><span class="score">{{ c.scoreB }}</span></span>
+    @if (c.detail) {
+      <span class="detail num">{{ c.detail }}</span>
+    }
+  </article>
+</ng-template>

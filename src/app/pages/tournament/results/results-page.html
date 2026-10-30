@@ -1,0 +1,156 @@
+<div class="toolbar no-print">
+  @if (!finished()) {
+    <p class="notice">Tournoi en cours : le classement ci-dessous est provisoire.</p>
+  }
+  <div class="buttons">
+    <button type="button" class="btn btn--outline" (click)="print()">
+      <app-icon name="download" [strokeWidth]="2" />
+      Exporter en PDF
+    </button>
+    <button type="button" class="btn btn--primary" (click)="share()">
+      <app-icon name="share" [strokeWidth]="2" />
+      Partager les résultats
+    </button>
+  </div>
+  @if (shareMessage()) {
+    <p class="small muted" role="status">{{ shareMessage() }}</p>
+  }
+</div>
+
+<div class="top">
+  @if (finished() && podium().length) {
+    <section class="podium-card">
+      <h2 class="display">Podium</h2>
+      <div class="podium">
+        @for (p of podium(); track p.place) {
+          <div class="step" [class]="'step--' + p.place">
+            @if (p.place === 1) {
+              <span class="crown" role="img" aria-label="Champion"><app-icon name="trophy" [size]="40" [strokeWidth]="1.8" /></span>
+            }
+            <app-team-avatar [team]="p.row.team" [size]="p.place === 1 ? 64 : 56" [class.champion]="p.place === 1" />
+            <span class="podium-name">{{ p.row.team.name }}</span>
+            <div class="block">{{ p.place }}</div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  @if (t().format === 'mixer') {
+    @let mp = mixerPools();
+    <section class="card bracket-card">
+      <h2 class="display display-l">
+        {{ mp.stage === 3 ? 'Poules de classement' : 'Phase ' + mp.stage }}
+      </h2>
+      <div class="mixer-pools">
+        @for (p of mp.pools; track p.pool.letter) {
+          <div class="mixer-pool">
+            <span class="round-title">Poule {{ p.pool.letter }} · {{ p.pool.name }}</span>
+            <ol>
+              @for (row of p.rows; track row.teamId; let i = $index) {
+                <li>
+                  <span class="place">{{ mp.stage === 3 ? p.offset + i + 1 : i + 1 }}</span>
+                  <span class="mixer-name">{{ row.name }}</span>
+                  <span class="num muted"><strong class="pts">{{ row.pointsFor }} pts</strong> · {{ row.wins }} V</span>
+                </li>
+              }
+            </ol>
+          </div>
+        }
+      </div>
+    </section>
+  } @else if (t().format !== 'league') {
+    <section class="card bracket-card">
+      <h2 class="display display-l">Phase finale</h2>
+      @if (rounds().length) {
+        <div class="bracket-scroll">
+          <div class="bracket">
+            @for (r of rounds(); track r.round) {
+              <div class="round">
+                <span class="round-title" [class.final]="r.title === 'Finale'">{{ r.title }}</span>
+                <div class="round-matches">
+                  @for (m of r.matches; track m.id) {
+                    <div class="box" [class.box--final]="m.final" [class.box--bye]="m.bye">
+                      @for (row of m.rows; track $index) {
+                        <div class="box-row" [class.win]="row.win">
+                          <span>
+                            @if (row.win && m.final) {
+                              <app-icon name="trophy" [size]="16" [strokeWidth]="2" />
+                            }
+                            {{ row.name }}
+                            @if (row.tag) {
+                              <small>{{ row.tag }}</small>
+                            }
+                          </span>
+                          <span class="num">{{ row.sets }}</span>
+                        </div>
+                      }
+                    </div>
+                    @if (m.final && m.detail) {
+                      <span class="detail num">{{ m.detail }}</span>
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+        @if (third(); as th) {
+          <div class="third">
+            <span class="round-title">Match pour la 3e place</span>
+            <span>
+              <span [class.strong]="th.rows[0].win">{{ th.rows[0].name }}</span>
+              <span class="num"> {{ th.rows[0].sets }} – {{ th.rows[1].sets }} </span>
+              <span [class.strong]="th.rows[1].win">{{ th.rows[1].name }}</span>
+            </span>
+          </div>
+        }
+      } @else {
+        <p class="muted">La phase finale sera affichée une fois la phase de poules terminée.</p>
+      }
+    </section>
+  }
+</div>
+
+<section class="card">
+  <h2 class="display display-l">{{ finished() ? 'Classement final' : 'Classement provisoire' }}</h2>
+  <div class="table-wrap">
+    @let singleSet = t().format === 'mixer' || t().settings.setsToWin === 1;
+    <table class="table ranking">
+      <thead>
+        <tr>
+          <th class="left" scope="col">Rang</th>
+          <th class="left" scope="col">Équipe</th>
+          <th scope="col">Matchs</th>
+          <th scope="col">Victoires</th>
+          @if (singleSet) {
+            <th scope="col">Écart</th>
+            <th scope="col">Pts marqués</th>
+          } @else {
+            <th scope="col">Sets</th>
+          }
+          <th class="left" scope="col">Parcours</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of ranking(); track r.teamId) {
+          <tr>
+            <td class="left">
+              <span class="rank" [class.rank--top]="r.rank === 1 && finished()" [class.rank--dark]="(r.rank === 2 || r.rank === 3) && finished()">{{ r.rank }}</span>
+            </td>
+            <td class="left" [class.strong]="r.rank <= 3">{{ r.team.name }}</td>
+            <td>{{ r.played }}</td>
+            <td>{{ r.wins }}</td>
+            @if (singleSet) {
+              <td>{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</td>
+              <td>{{ r.pointsFor }}</td>
+            } @else {
+              <td>{{ r.setsWon }}-{{ r.setsLost }}</td>
+            }
+            <td class="left muted">{{ r.journey }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
