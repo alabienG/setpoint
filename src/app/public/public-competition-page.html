@@ -148,7 +148,7 @@
                     <th class="left" scope="col">Équipe</th>
                     <th scope="col">Matchs</th>
                     <th scope="col">Victoires</th>
-                    <th scope="col">Pts marqués</th>
+                    <th scope="col"><abbr title="Écart de points">Écart</abbr></th>
                     <th class="left" scope="col">Parcours</th>
                   </tr>
                 </thead>
@@ -159,7 +159,8 @@
                       <td class="left"><strong>{{ r.team.name }}</strong></td>
                       <td>{{ r.played }}</td>
                       <td>{{ r.wins }}</td>
-                      <td>{{ r.pointsFor }}</td>
+                      @let diff = r.pointsFor - r.pointsAgainst;
+                      <td><strong>{{ diff > 0 ? '+' : '' }}{{ diff }}</strong></td>
                       <td class="left muted">{{ r.journey }}</td>
                     </tr>
                   }

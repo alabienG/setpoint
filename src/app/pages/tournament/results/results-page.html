@@ -126,7 +126,6 @@
           <th scope="col">Victoires</th>
           @if (singleSet) {
             <th scope="col">Écart</th>
-            <th scope="col">Pts marqués</th>
           } @else {
             <th scope="col">Sets</th>
           }
@@ -143,8 +142,7 @@
             <td>{{ r.played }}</td>
             <td>{{ r.wins }}</td>
             @if (singleSet) {
-              <td>{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</td>
-              <td>{{ r.pointsFor }}</td>
+              <td><strong>{{ r.pointsFor - r.pointsAgainst > 0 ? '+' : '' }}{{ r.pointsFor - r.pointsAgainst }}</strong></td>
             } @else {
               <td>{{ r.setsWon }}-{{ r.setsLost }}</td>
             }
