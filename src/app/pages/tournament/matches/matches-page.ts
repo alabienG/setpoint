@@ -11,10 +11,11 @@ import {
   nextStep,
   poolStandings,
   progress,
+  stageLevels,
   stagePools,
 } from '../../../domain/tournament-engine';
 import { Icon } from '../../../shared/icon';
-import { matchTag, matchTagClass } from '../../../shared/match-display';
+import { levelClass, matchTag, matchTagClass } from '../../../shared/match-display';
 import { TournamentContext } from '../tournament-context';
 
 type Filter = 'all' | MatchStatus;
@@ -31,6 +32,7 @@ const STATUS_LABELS: Record<MatchStatus, string> = { live: 'En direct', done: 'T
 export class MatchesPage {
   protected readonly ctx = inject(TournamentContext);
   protected readonly tagClass = matchTagClass;
+  protected readonly levelClass = levelClass;
   protected readonly statusLabels: Record<string, string> = STATUS_LABELS;
 
   protected readonly filter = signal<Filter>('all');
@@ -171,7 +173,8 @@ export class MatchesPage {
         const fourPools = stagePools(t, 1).length === 4;
         return {
           title: `Phase ${stage} · Poule ${pool.letter}`,
-          subtitle: pool.name,
+          subtitle: stage === 1 ? pool.name : undefined,
+          level: stageLevels(t, stage).get(pool.letter),
           rows: poolStandings(t, pool),
           qualified: stage < 3 && fourPools ? 2 : 0,
           note: mixerStageNote(t, stage),

@@ -155,7 +155,9 @@
           @let singleSet = t().format === 'mixer' || t().settings.setsToWin === 1;
           <h3 class="display display-m">
             {{ tb.title }}
-            @if (tb.subtitle) {
+            @if (tb.level) {
+              <span [class]="levelClass(tb.level.rank)">{{ tb.level.name }}</span>
+            } @else if (tb.subtitle) {
               <span class="subtle">· {{ tb.subtitle }}</span>
             }
           </h3>

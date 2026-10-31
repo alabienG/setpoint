@@ -1,8 +1,8 @@
 import { DEFAULT_SETTINGS, Match, Team, Tournament } from '../core/models';
 import { buildBracket, resolveBracket, seedOrder } from './bracket';
-import { distributeIntoPools, roundRobin, schedule } from './draw';
+import { distributeIntoPools, mixerRotations, roundRobin, schedule } from './draw';
 import { estimateMatches } from './formats';
-import { emptySets, evaluateMatch, setWinner, standings } from './scoring';
+import { emptySets, evaluateMatch, matchTeams, setWinner, standings } from './scoring';
 import { refereeCounts } from './referees';
 import { googleSheetCsvUrl, parseTeams } from './team-import';
 import {
@@ -17,6 +17,7 @@ import {
   normalize,
   poolStandings,
   stagePools,
+  withLevelStarts,
 } from './tournament-engine';
 
 const settings = DEFAULT_SETTINGS;
@@ -187,57 +188,6 @@ describe('set unique avec plafond', () => {
   });
 });
 
-describe('poules brassées', () => {
-  function mixer(): Tournament {
-    const t = tournament('mixer', 16);
-    return {
-      ...t,
-      drawMode: 'level',
-      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: 16 },
-      teams: t.teams.map((team, i) => ({ ...team, seed: false, rating: 5 - Math.floor(i / 4) })),
-    };
-  }
-
-  it('forme des poules de niveau homogène', () => {
-    const draw = generateDraw(mixer());
-    expect(draw.pools.map((p) => p.teamIds.map((id) => Number(id.slice(1))).sort((a, b) => a - b))).toEqual([
-      [1, 2, 3, 4],
-      [5, 6, 7, 8],
-      [9, 10, 11, 12],
-      [13, 14, 15, 16],
-    ]);
-    expect(draw.matches).toHaveLength(24);
-    expect(draw.matches[0].start).toBe(9 * 60);
-  });
-
-  it('brasse selon le modèle et classe de 1 à 16', () => {
-    let t = mixer();
-    t = { ...t, ...generateDraw(t), stage: 'running' };
-    t = playAll(t);
-    expect(canGenerateNextStage(t)).toBe(true);
-
-    const r1 = stagePools(t, 1).map((p) => poolStandings(t, p).map((row) => row.teamId));
-    let next = generateNextStage(t);
-    expect(next.pools[0].teamIds).toEqual([r1[0][0], r1[2][0], r1[1][1], r1[3][1]]);
-    expect(next.pools[3].teamIds).toEqual([r1[1][2], r1[3][2], r1[0][3], r1[2][3]]);
-    // La phase 2 commence après les 8 créneaux de 20 minutes de la phase 1.
-    expect(Math.min(...next.matches.map((m) => m.start!))).toBe(9 * 60 + 8 * 20);
-    t = playAll({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] });
-
-    const r2 = stagePools(t, 2).map((p) => poolStandings(t, p).map((row) => row.teamId));
-    next = generateNextStage(t);
-    expect(next.pools[0].teamIds).toEqual([r2[0][0], r2[0][1], r2[1][0], r2[1][1]]);
-    t = playAll({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] });
-
-    expect(t.matches).toHaveLength(72);
-    expect(t.stage).toBe('finished');
-    const ranking = finalRanking(t);
-    expect(ranking).toHaveLength(16);
-    expect(ranking[0].teamId).toBe(poolStandings(t, stagePools(t, 3)[0])[0].teamId);
-    expect(ranking[8].teamId).toBe(poolStandings(t, stagePools(t, 3)[2])[0].teamId);
-  });
-});
-
 describe('import des équipes', () => {
   it('lit la feuille d’inscription en binômes', () => {
     const csv = [
@@ -268,134 +218,276 @@ describe('import des équipes', () => {
   });
 });
 
-describe('poules brassées à 12 équipes', () => {
-  it('enchaîne 3 phases de 3 poules et classe de 1 à 12', () => {
-    const base = tournament('mixer', 12);
-    let t: Tournament = {
+describe('poules brassées (4 contre 4)', () => {
+  function mixer(n: number): Tournament {
+    const base = tournament('mixer', n);
+    return {
       ...base,
       drawMode: 'level',
-      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: 12 },
+      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: n },
       teams: base.teams.map((team, i) => ({ ...team, seed: false, rating: 5 - Math.floor(i / 4) })),
     };
+  }
+
+  function nextStage(t: Tournament): Tournament {
+    const next = generateNextStage(t);
+    return playAll(normalize({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] }));
+  }
+
+  it('forme des poules de niveau homogène, chacune jouant 3 matchs en 4 contre 4', () => {
+    const draw = generateDraw(mixer(16));
+    expect(draw.pools.map((p) => p.teamIds.map((id) => Number(id.slice(1))).sort((a, b) => a - b))).toEqual([
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+    ]);
+    expect(draw.matches).toHaveLength(12);
+    const [a, b, c, d] = draw.pools[0].teamIds;
+    const pool1 = draw.matches.filter((m) => m.pool === '1');
+    expect(pool1.map((m) => [[m.a.teamId, m.a.partnerId], [m.b.teamId, m.b.partnerId]])).toEqual([
+      [[a, b], [c, d]],
+      [[a, c], [b, d]],
+      [[a, d], [b, c]],
+    ]);
+    // Comme le modèle : 4 tours de 3 terrains, une poule au repos à chaque tour.
+    expect(Math.max(...draw.matches.map((m) => m.slot))).toBe(3);
+    expect(draw.matches[0].start).toBe(9 * 60);
+  });
+
+  it('donne à chaque paire le résultat de son camp', () => {
+    let t = mixer(16);
     t = { ...t, ...generateDraw(t), stage: 'running' };
-    expect(t.pools).toHaveLength(3);
-    expect(t.matches).toHaveLength(18);
-    t = playAll(t);
+    const first = t.matches.find((m) => m.pool === '1' && m.round === 1)!;
+    t = normalize({
+      ...t,
+      matches: t.matches.map((m) => (m.id === first.id ? { ...m, sets: [[19, 15]], status: 'done' } : m)),
+    });
+    const rows = new Map(poolStandings(t, t.pools[0]).map((r) => [r.teamId, r]));
+    for (const id of [first.a.teamId!, first.a.partnerId!]) expect(rows.get(id)).toMatchObject({ wins: 1, pointsFor: 19, pointsAgainst: 15 });
+    for (const id of [first.b.teamId!, first.b.partnerId!]) expect(rows.get(id)).toMatchObject({ losses: 1, pointsFor: 15, pointsAgainst: 19 });
+  });
+
+  it('brasse selon le modèle et classe de 1 à 16', () => {
+    let t = mixer(16);
+    t = playAll(normalize({ ...t, ...generateDraw(t), stage: 'running' }));
+    expect(canGenerateNextStage(t)).toBe(true);
 
     const r1 = stagePools(t, 1).map((p) => poolStandings(t, p).map((row) => row.teamId));
-    let next = generateNextStage(t);
-    expect(next.pools.map((p) => p.name)).toEqual(['Principale', 'Intermédiaire', 'Consolante']);
-    expect(next.pools[0].teamIds).toEqual([r1[0][0], r1[1][0], r1[2][0], r1[0][1]]);
-    t = playAll({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] });
+    const phase2 = generateNextStage(t);
+    expect(phase2.pools.map((p) => p.teamIds)).toEqual([
+      [r1[0][0], r1[2][0], r1[1][1], r1[3][1]],
+      [r1[1][0], r1[3][0], r1[2][1], r1[0][1]],
+      [r1[0][2], r1[2][2], r1[1][3], r1[3][3]],
+      [r1[1][2], r1[3][2], r1[0][3], r1[2][3]],
+    ]);
+    // La phase 2 commence après les 4 tours de 20 minutes de la phase 1, et ses éventuels barrages
+    // (10 minutes chacun).
+    const barrageSlots = new Set(t.matches.filter((m) => m.kind === 'tiebreak').map((m) => m.slot)).size;
+    expect(Math.min(...phase2.matches.map((m) => m.start!))).toBe(9 * 60 + 4 * 20 + barrageSlots * 10);
+    t = nextStage(t);
 
     const r2 = stagePools(t, 2).map((p) => poolStandings(t, p).map((row) => row.teamId));
-    next = generateNextStage(t);
-    // Montée / descente : le 4e de la poule 1 descend, le 1er de la poule 2 monte.
-    expect(next.pools[0].teamIds).toEqual([r2[0][0], r2[0][1], r2[0][2], r2[1][0]]);
-    expect(next.pools[1].teamIds).toContain(r2[0][3]);
-    t = playAll({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] });
+    expect(generateNextStage(t).pools[0].teamIds).toEqual([r2[0][0], r2[0][1], r2[1][0], r2[1][1]]);
+    t = nextStage(t);
 
-    expect(t.matches).toHaveLength(54);
+    expect(t.matches.filter((m) => m.kind !== 'tiebreak')).toHaveLength(36);
     expect(t.stage).toBe('finished');
+    expect(stagePools(t, 3).map((p) => p.name)).toEqual(['Places 1 à 4', 'Places 5 à 8', 'Places 9 à 12', 'Places 13 à 16']);
     const ranking = finalRanking(t);
-    expect(new Set(ranking.map((r) => r.teamId)).size).toBe(12);
-    expect(ranking[4].teamId).toBe(poolStandings(t, stagePools(t, 3)[1])[0].teamId);
+    expect(new Set(ranking.map((r) => r.teamId)).size).toBe(16);
+    expect(ranking[0].teamId).toBe(poolStandings(t, stagePools(t, 3)[0])[0].teamId);
+    expect(ranking[8].teamId).toBe(poolStandings(t, stagePools(t, 3)[2])[0].teamId);
   });
 
-  it('bloque le tirage en dehors de 9 à 16 équipes', () => {
-    expect(drawBlockers(tournament('mixer', 8))).toEqual(['Le format « Poules brassées » se joue de 9 à 16 équipes (8 inscrites).']);
-    expect(drawBlockers(tournament('mixer', 11))).toEqual([]);
+  it('enchaîne les 3 phases à 12 paires', () => {
+    let t = mixer(12);
+    t = playAll(normalize({ ...t, ...generateDraw(t), stage: 'running' }));
+    expect(t.pools).toHaveLength(3);
+    const r1 = stagePools(t, 1).map((p) => poolStandings(t, p).map((row) => row.teamId));
+    const phase2 = generateNextStage(t);
+    expect(phase2.pools.map((p) => p.name)).toEqual(['Principale', 'Intermédiaire', 'Consolante']);
+    expect(phase2.pools[0].teamIds).toEqual([r1[0][0], r1[1][0], r1[2][0], r1[0][1]]);
+    t = nextStage(t);
+    const r2 = stagePools(t, 2).map((p) => poolStandings(t, p).map((row) => row.teamId));
+    // Montée / descente : le 4e de la poule 1 descend, le 1er de la poule 2 monte.
+    expect(generateNextStage(t).pools[0].teamIds).toEqual([r2[0][0], r2[0][1], r2[0][2], r2[1][0]]);
+    t = nextStage(t);
+    expect(t.matches.filter((m) => m.kind !== 'tiebreak')).toHaveLength(27);
+    expect(t.stage).toBe('finished');
+    expect(new Set(finalRanking(t).map((r) => r.teamId)).size).toBe(12);
   });
-});
 
-describe('poules brassées avec poules de 3', () => {
-  function play(teamCount: number): Tournament {
-    const base = tournament('mixer', teamCount);
-    let t: Tournament = {
-      ...base,
-      drawMode: 'level',
-      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: 16 },
-      teams: base.teams.map((team, i) => ({ ...team, seed: false, rating: 5 - i / 4 })),
-    };
-    t = { ...t, ...generateDraw(t), stage: 'running' };
-    t = playAll(t);
-    for (const _ of [2, 3]) {
-      const next = generateNextStage(t);
-      t = playAll({ ...t, pools: [...t.pools, ...next.pools], matches: [...t.matches, ...next.matches] });
+  it('se joue uniquement à 12, 15 ou 16 paires', () => {
+    expect(drawBlockers(mixer(14))).toEqual(['Le format « Poules brassées » (4 contre 4) se joue à 12, 15 ou 16 paires (14 inscrites).']);
+    for (const n of [12, 15, 16]) expect(drawBlockers(mixer(n))).toEqual([]);
+  });
+
+  it('équilibre parfaitement une poule de 5 paires', () => {
+    const rotations = mixerRotations(['p1', 'p2', 'p3', 'p4', 'p5']);
+    const key = (x: string, y: string) => [x, y].sort().join('-');
+    const partners = new Map<string, number>();
+    const opponents = new Map<string, number>();
+    const played = new Map<string, number>();
+    for (const [sideA, sideB] of rotations) {
+      for (const side of [sideA, sideB]) partners.set(key(side[0], side[1]), (partners.get(key(side[0], side[1])) ?? 0) + 1);
+      for (const x of sideA) for (const y of sideB) opponents.set(key(x, y), (opponents.get(key(x, y)) ?? 0) + 1);
+      for (const x of [...sideA, ...sideB]) played.set(x, (played.get(x) ?? 0) + 1);
     }
-    return t;
-  }
+    expect(rotations).toHaveLength(5);
+    // 10 couples de paires : chacun partenaire une fois et adversaire deux fois ; chaque paire joue 4 matchs.
+    expect([partners.size, ...new Set(partners.values())]).toEqual([10, 1]);
+    expect([opponents.size, ...new Set(opponents.values())]).toEqual([10, 2]);
+    expect([...played.values()]).toEqual([4, 4, 4, 4, 4]);
+  });
 
-  for (let n = 9; n <= 16; n++) {
-    it(`joue un tournoi complet à ${n} équipes avec des poules de 3 ou 4`, () => {
-      const t = play(n);
-      for (const stage of [1, 2, 3]) {
-        const sizes = stagePools(t, stage).map((p) => p.teamIds.length);
-        expect(sizes.every((s) => s === 3 || s === 4)).toBe(true);
-        expect(sizes.reduce((a, b) => a + b, 0)).toBe(n);
-        expect(new Set(stagePools(t, stage).flatMap((p) => p.teamIds)).size).toBe(n);
-      }
-      expect(t.stage).toBe('finished');
-      const ranking = finalRanking(t);
-      expect(new Set(ranking.map((r) => r.teamId)).size).toBe(n);
-      expect(stagePools(t, 3).at(-1)!.name).toMatch(new RegExp(`à ${n}$`));
+  it('indique le niveau de chaque paire à partir de la phase 2', () => {
+    let t = mixer(16);
+    t = playAll(normalize({ ...t, ...generateDraw(t), stage: 'running' }));
+    expect(finalRanking(t).some((r) => r.level)).toBe(false);
+    t = nextStage(t);
+    const phase2 = finalRanking(t).map((r) => r.level);
+    expect(phase2.slice(0, 8).every((l) => l?.name === 'Principale' && l.rank === 0)).toBe(true);
+    expect(phase2.slice(8).every((l) => l?.name === 'Consolante' && l.rank === 1)).toBe(true);
+    expect(withLevelStarts(finalRanking(t)).filter((r) => r.levelStart).map((r) => r.rank)).toEqual([1, 9]);
+    t = nextStage(t);
+    expect([...new Set(finalRanking(t).map((r) => r.level?.name))]).toEqual([
+      'Places 1 à 4',
+      'Places 5 à 8',
+      'Places 9 à 12',
+      'Places 13 à 16',
+    ]);
+  });
+
+  it('enchaîne les 3 phases à 15 paires, en poules de 5', () => {
+    let t = mixer(15);
+    t = playAll(normalize({ ...t, ...generateDraw(t), stage: 'running' }));
+    expect(t.pools.map((p) => p.teamIds.length)).toEqual([5, 5, 5]);
+    expect(t.matches.filter((m) => m.stage === 1 && m.kind !== 'tiebreak')).toHaveLength(15);
+    // Les 3 poules jouent en même temps sur les 3 terrains : 5 tours.
+    expect(Math.max(...t.matches.filter((m) => m.kind !== 'tiebreak').map((m) => m.slot))).toBe(4);
+
+    const r1 = stagePools(t, 1).map((p) => poolStandings(t, p).map((row) => row.teamId));
+    const phase2 = generateNextStage(t);
+    expect(phase2.pools.map((p) => p.name)).toEqual(['Principale', 'Intermédiaire', 'Consolante']);
+    expect(phase2.pools[0].teamIds).toEqual([r1[0][0], r1[1][0], r1[2][0], r1[0][1], r1[1][1]]);
+    t = nextStage(t);
+
+    const r2 = stagePools(t, 2).map((p) => poolStandings(t, p).map((row) => row.teamId));
+    expect(generateNextStage(t).pools.map((p) => p.teamIds)).toEqual([
+      [r2[0][0], r2[0][1], r2[0][2], r2[0][3], r2[1][0]],
+      [r2[0][4], r2[1][1], r2[1][2], r2[1][3], r2[2][0]],
+      [r2[1][4], r2[2][1], r2[2][2], r2[2][3], r2[2][4]],
+    ]);
+    t = nextStage(t);
+    expect(t.matches.filter((m) => m.kind !== 'tiebreak')).toHaveLength(45);
+    expect(t.stage).toBe('finished');
+    expect(stagePools(t, 3).map((p) => p.name)).toEqual(['Places 1 à 5', 'Places 6 à 10', 'Places 11 à 15']);
+    expect(new Set(finalRanking(t).map((r) => r.teamId)).size).toBe(15);
+  });
+
+  describe('classement d’une poule', () => {
+    const base = { phase: 'pool', status: 'done', slot: 0, court: 1, label: '', pool: '1', stage: 1 } as const;
+    // Poule t1, t2, t3, t4 : (t1+t2) / (t3+t4), (t1+t3) / (t2+t4), (t1+t4) / (t2+t3).
+    function pool(scores: [number, number][]): ReturnType<typeof poolStandings> {
+      const sides = [
+        [['t1', 't2'], ['t3', 't4']],
+        [['t1', 't3'], ['t2', 't4']],
+        [['t1', 't4'], ['t2', 't3']],
+      ];
+      const matches: Match[] = scores.map(([x, y], i) => ({
+        ...base,
+        id: `m${i + 1}`,
+        round: i + 1,
+        a: { teamId: sides[i][0][0], partnerId: sides[i][0][1] },
+        b: { teamId: sides[i][1][0], partnerId: sides[i][1][1] },
+        sets: [[x, y]],
+      }));
+      const t: Tournament = {
+        ...tournament('mixer', 4),
+        pools: [{ letter: '1', stage: 1, teamIds: ['t1', 't2', 't3', 't4'] }],
+        matches,
+      };
+      return poolStandings(t, t.pools[0]);
+    }
+
+    it('classe chaque paire à l’écart cumulé de son camp', () => {
+      // t1 : +9 +2 −4 = +7 ; t2 : +9 −2 +4 = +11 ; t3 : −9 +2 +4 = −3 ; t4 : −9 −2 −4 = −15.
+      const rows = pool([[19, 10], [19, 17], [15, 19]]);
+      expect(rows.map((r) => [r.teamId, r.pointsFor - r.pointsAgainst])).toEqual([
+        ['t2', 11],
+        ['t1', 7],
+        ['t3', -3],
+        ['t4', -15],
+      ]);
     });
-  }
 
-  it('met la poule de 3 en dernier à 15 équipes et garde le modèle de brassage', () => {
-    const t = play(15);
-    expect(stagePools(t, 1).map((p) => p.teamIds.length)).toEqual([4, 4, 4, 3]);
-    expect(stagePools(t, 3).map((p) => p.name)).toEqual(['Places 1 à 4', 'Places 5 à 8', 'Places 9 à 12', 'Places 13 à 15']);
-    // La poule de 3 joue 3 matchs par phase au lieu de 6.
-    expect(t.matches.filter((m) => m.stage === 1 && m.pool === '4')).toHaveLength(3);
-  });
-});
+    function poolTournament(scores: [number, number][]): Tournament {
+      const sides = [
+        [['t1', 't2'], ['t3', 't4']],
+        [['t1', 't3'], ['t2', 't4']],
+        [['t1', 't4'], ['t2', 't3']],
+      ];
+      return {
+        ...tournament('mixer', 4),
+        stage: 'running',
+        pools: [{ letter: '1', stage: 1, teamIds: ['t1', 't2', 't3', 't4'] }],
+        matches: scores.map(([x, y], i) => ({
+          ...base,
+          id: `m${i + 1}`,
+          round: i + 1,
+          start: 9 * 60,
+          a: { teamId: sides[i][0][0], partnerId: sides[i][0][1] },
+          b: { teamId: sides[i][1][0], partnerId: sides[i][1][1] },
+          sets: [[x, y]],
+        })),
+      };
+    }
 
-describe('classement des poules brassées', () => {
-  const base = { phase: 'pool', status: 'done', slot: 0, court: 1, round: 1, label: '', pool: '1', stage: 1 } as const;
+    it('crée un barrage en 6 points entre deux paires à égalité, qui bloque la phase suivante', () => {
+      const t = normalize(poolTournament([[19, 10], [19, 17], [18, 20]]));
+      const barrages = t.matches.filter((m) => m.kind === 'tiebreak');
+      expect(barrages).toHaveLength(1);
+      expect([barrages[0].a.teamId, barrages[0].b.teamId]).toEqual(['t1', 't2']);
+      expect(barrages[0].a.partnerId).toBeUndefined();
+      expect(matchRules(t, barrages[0])).toMatchObject({ setsToWin: 1, pointsPerSet: 6, cap: 6 });
+      expect(barrages[0].slot).toBe(1);
+      expect(canGenerateNextStage(t)).toBe(false);
+      // Rappeler normalize ne crée pas de doublon.
+      expect(normalize(t).matches.filter((m) => m.kind === 'tiebreak')).toHaveLength(1);
+    });
 
-  function pool(matches: Match[]): string[] {
-    const t: Tournament = {
-      ...tournament('mixer', 4),
-      pools: [{ letter: '1', stage: 1, teamIds: ['t1', 't2', 't3', 't4'] }],
-      matches,
-    };
-    return poolStandings(t, t.pools[0]).map((r) => r.teamId);
-  }
+    it('classe devant le vainqueur du barrage, sans toucher à l’écart', () => {
+      let t = normalize(poolTournament([[19, 10], [19, 17], [18, 20]]));
+      const barrage = t.matches.find((m) => m.kind === 'tiebreak')!;
+      t = normalize({
+        ...t,
+        matches: t.matches.map((m) => (m.id === barrage.id ? { ...m, sets: [[4, 6]], status: 'done' } : m)),
+      });
+      const rows = poolStandings(t, t.pools[0]);
+      expect(rows.slice(0, 2).map((r) => [r.teamId, r.pointsFor - r.pointsAgainst])).toEqual([
+        ['t2', 9],
+        ['t1', 9],
+      ]);
+      expect(canGenerateNextStage(t)).toBe(true);
+    });
 
-  it('classe à l’écart de points, même avec moins de victoires', () => {
-    // t2 ne gagne qu'un match mais avec un gros écart (+15) ; t3 (+4) et t1 (+2) en gagnent deux.
-    expect(
-      pool([
-        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't2' }, sets: [[19, 17]] },
-        { ...base, id: '2', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 2]] },
-        { ...base, id: '3', a: { teamId: 't3' }, b: { teamId: 't1' }, sets: [[19, 17]] },
-        { ...base, id: '4', a: { teamId: 't3' }, b: { teamId: 't4' }, sets: [[19, 17]] },
-        { ...base, id: '5', a: { teamId: 't1' }, b: { teamId: 't4' }, sets: [[20, 18]] },
-      ]),
-    ).toEqual(['t2', 't3', 't1', 't4']);
-  });
+    it('ne crée pas de barrage sans égalité', () => {
+      const t = normalize(poolTournament([[19, 10], [19, 17], [15, 19]]));
+      expect(t.matches.some((m) => m.kind === 'tiebreak')).toBe(false);
+    });
 
-  it('ne tient pas compte du total de points marqués', () => {
-    // t1 marque 40 points pour un écart de +3 ; t2 n'en marque que 19, mais pour un écart de +19.
-    expect(
-      pool([
-        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't3' }, sets: [[21, 20]] },
-        { ...base, id: '2', a: { teamId: 't1' }, b: { teamId: 't4' }, sets: [[19, 17]] },
-        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 0]] },
-      ]),
-    ).toEqual(['t2', 't1', 't3', 't4']);
-  });
-
-  it('départage deux équipes à égalité d’écart par la confrontation directe', () => {
-    // t1 et t2 sont à +17 chacun ; t2 a battu t1.
-    expect(
-      pool([
-        { ...base, id: '1', a: { teamId: 't1' }, b: { teamId: 't2' }, sets: [[17, 19]] },
-        { ...base, id: '2', a: { teamId: 't1' }, b: { teamId: 't3' }, sets: [[19, 0]] },
-        { ...base, id: '3', a: { teamId: 't2' }, b: { teamId: 't4' }, sets: [[19, 4]] },
-      ]),
-    ).toEqual(['t2', 't1', 't4', 't3']);
+    it('deux paires à égalité d’écart le sont aussi sur leurs confrontations et leurs points', () => {
+      // t1 et t2 jouent ensemble le 1er match et s'affrontent dans les deux autres :
+      // à égalité d'écart, leurs confrontations s'annulent forcément (une victoire chacune).
+      const rows = pool([[19, 10], [19, 17], [18, 20]]);
+      const t1 = rows.find((r) => r.teamId === 't1')!;
+      const t2 = rows.find((r) => r.teamId === 't2')!;
+      expect(t1.pointsFor - t1.pointsAgainst).toBe(t2.pointsFor - t2.pointsAgainst);
+      expect([t1.wins, t1.pointsFor]).toEqual([t2.wins, t2.pointsFor]);
+      // Égalité parfaite : l'ordre de la poule (niveau ou classement de la phase précédente) est conservé.
+      expect(rows.slice(0, 2).map((r) => r.teamId)).toEqual(['t1', 't2']);
+    });
   });
 });
 
@@ -405,7 +497,7 @@ describe('auto-arbitrage', () => {
     let t: Tournament = {
       ...base,
       drawMode: format === 'mixer' ? 'level' : base.drawMode,
-      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: 16, selfRefereeing },
+      settings: { ...DEFAULT_SETTINGS, courts: 3, maxTeams: teamCount, selfRefereeing },
       teams: base.teams.map((team, i) => ({ ...team, rating: 5 - i / 4 })),
     };
     t = normalize({ ...t, ...generateDraw(t), stage: 'running' });
@@ -424,21 +516,26 @@ describe('auto-arbitrage', () => {
     const played = t.matches.filter((m) => m.slot >= 0 && !m.bye);
     for (const m of played) {
       expect(m.referee).toBeDefined();
-      expect([m.a.teamId, m.b.teamId]).not.toContain(m.referee);
+      expect(matchTeams(m)).not.toContain(m.referee);
     }
     // Sur un même créneau, personne ne joue deux fois ni ne joue et arbitre à la fois.
     const slots = new Set(played.map((m) => m.slot));
     for (const slot of slots) {
-      const people = played.filter((m) => m.slot === slot).flatMap((m) => [m.a.teamId, m.b.teamId, m.referee]);
+      const people = played.filter((m) => m.slot === slot).flatMap((m) => [...matchTeams(m), m.referee]);
       expect(new Set(people).size).toBe(people.length);
     }
     return [...refereeCounts(t).values()];
   }
 
-  for (const n of [16, 15, 13, 12, 9]) {
-    it(`répartit l’arbitrage équitablement en poules brassées à ${n} équipes`, () => {
-      const counts = expectValidReferees(run('mixer', n));
-      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+  // En 4 contre 4, les seules paires libres d'un tour sont celles de la poule au repos, et la
+  // composition des poules suivantes dépend des résultats : l'écart vaut 1 le plus souvent,
+  // jamais plus de 2.
+  for (const n of [16, 15, 12]) {
+    it(`répartit l’arbitrage en poules brassées à ${n} paires`, () => {
+      const t = run('mixer', n);
+      const counts = expectValidReferees(t);
+      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(2);
+      expect(counts.reduce((a, b) => a + b, 0)).toBe(t.matches.length);
     });
   }
 
@@ -465,6 +562,15 @@ describe('auto-arbitrage', () => {
     const perSlot = new Map<number, number>();
     t.matches.forEach((m) => perSlot.set(m.slot, (perSlot.get(m.slot) ?? 0) + 1));
     expect(Math.max(...perSlot.values())).toBe(2);
+  });
+
+  it('fait arbitrer chaque match de poule de 5 par la paire au repos de cette poule', () => {
+    const t = run('mixer', 15);
+    for (const m of t.matches.filter((x) => x.kind !== 'tiebreak')) {
+      const pool = t.pools.find((p) => p.letter === m.pool && p.stage === m.stage)!;
+      const resting = pool.teamIds.filter((id) => !matchTeams(m).includes(id));
+      expect(resting).toEqual([m.referee]);
+    }
   });
 
   it('n’attribue aucun arbitre si l’option est désactivée', () => {

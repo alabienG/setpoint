@@ -45,7 +45,12 @@
       <div class="mixer-pools">
         @for (p of mp.pools; track p.pool.letter) {
           <div class="mixer-pool">
-            <span class="round-title">Poule {{ p.pool.letter }} · {{ p.pool.name }}</span>
+            <span class="round-title">
+              Poule {{ p.pool.letter }}
+              @if (p.level) {
+                <span [class]="levelClass(p.level.rank)">{{ p.level.name }}</span>
+              }
+            </span>
             <ol>
               @for (row of p.rows; track row.teamId; let i = $index) {
                 <li>
@@ -133,7 +138,12 @@
         </tr>
       </thead>
       <tbody>
-        @for (r of ranking(); track r.teamId) {
+        @for (r of rankingRows(); track r.teamId) {
+          @if (r.levelStart) {
+            <tr class="level-row">
+              <td colspan="6"><span [class]="levelClass(r.level!.rank)">{{ r.level!.name }}</span></td>
+            </tr>
+          }
           <tr>
             <td class="left">
               <span class="rank" [class.rank--top]="r.rank === 1 && finished()" [class.rank--dark]="(r.rank === 2 || r.rank === 3) && finished()">{{ r.rank }}</span>

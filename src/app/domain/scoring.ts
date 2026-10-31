@@ -1,4 +1,4 @@
-import { Match, MatchRules, SetScore, Side } from '../core/models';
+import { Match, MatchRules, MatchSlot, SetScore, Side } from '../core/models';
 
 export interface MatchResult {
   setsA: number;
@@ -110,6 +110,26 @@ export function playedSets(match: Match): SetScore[] {
   return match.sets.filter((s) => s[0] !== null && s[1] !== null);
 }
 
+/** Équipes (paires) d'un camp : une seule, ou deux en 4 contre 4. */
+export function sideTeams(slot: MatchSlot): string[] {
+  return [slot.teamId, slot.partnerId].filter((id): id is string => !!id);
+}
+
+/** Toutes les équipes (paires) qui jouent un match. */
+export function matchTeams(match: Match): string[] {
+  return [...sideTeams(match.a), ...sideTeams(match.b)];
+}
+
+/** Côté d'une équipe dans un match (en 4 contre 4, une paire joue avec sa partenaire). */
+export function sideOf(match: Match, teamId: string): Side | null {
+  if (sideTeams(match.a).includes(teamId)) return 'a';
+  return sideTeams(match.b).includes(teamId) ? 'b' : null;
+}
+
+/**
+ * Statistiques par équipe. En 4 contre 4, chaque paire d'un camp reçoit le résultat de son camp
+ * (victoire, points marqués et encaissés) : le classement reste individuel par paire.
+ */
 export function computeStats(
   teamIds: readonly string[],
   matches: readonly Match[],
@@ -122,28 +142,35 @@ export function computeStats(
     ]),
   );
   for (const match of matches) {
-    if (match.status !== 'done' || match.bye) continue;
-    const a = match.a.teamId ? stats.get(match.a.teamId) : undefined;
-    const b = match.b.teamId ? stats.get(match.b.teamId) : undefined;
+    if (match.status !== 'done' || match.bye || !match.a.teamId || !match.b.teamId) continue;
     const rules = rulesOf(rulesSource, match);
     const result = evaluateMatch(match, rules);
-    if (!a || !b || !result.winner) continue;
-    a.played++;
-    b.played++;
-    a.setsWon += result.setsA;
-    a.setsLost += result.setsB;
-    b.setsWon += result.setsB;
-    b.setsLost += result.setsA;
-    a.pointsFor += result.pointsA;
-    a.pointsAgainst += result.pointsB;
-    b.pointsFor += result.pointsB;
-    b.pointsAgainst += result.pointsA;
-    const [winner, loser] = result.winner === 'a' ? [a, b] : [b, a];
-    winner.wins++;
-    loser.losses++;
+    if (!result.winner) continue;
     const decidingSet = maxSets(rules) > 1 && result.setsA + result.setsB === maxSets(rules);
-    winner.rankingPoints += decidingSet ? 2 : 3;
-    loser.rankingPoints += decidingSet ? 1 : 0;
+    const credit = (side: Side) => {
+      const [setsFor, setsAgainst, pointsFor, pointsAgainst] =
+        side === 'a'
+          ? [result.setsA, result.setsB, result.pointsA, result.pointsB]
+          : [result.setsB, result.setsA, result.pointsB, result.pointsA];
+      for (const teamId of sideTeams(match[side])) {
+        const row = stats.get(teamId);
+        if (!row) continue;
+        row.played++;
+        row.setsWon += setsFor;
+        row.setsLost += setsAgainst;
+        row.pointsFor += pointsFor;
+        row.pointsAgainst += pointsAgainst;
+        if (result.winner === side) {
+          row.wins++;
+          row.rankingPoints += decidingSet ? 2 : 3;
+        } else {
+          row.losses++;
+          row.rankingPoints += decidingSet ? 1 : 0;
+        }
+      }
+    };
+    credit('a');
+    credit('b');
   }
   return stats;
 }
@@ -165,8 +192,10 @@ export function comparePointDifference(x: TeamStats, y: TeamStats): number {
 }
 
 /**
- * Classement d'un groupe selon `compare` ; deux équipes à égalité se départagent à la confrontation directe,
- * puis (égalité à trois ou plus) aux critères généraux.
+ * Classement d'un groupe selon `compare`. Deux équipes à égalité se départagent sur les matchs où
+ * elles étaient adversaires (en 4 contre 4, deux paires d'une poule s'affrontent deux fois et
+ * jouent ensemble une fois) : victoires, puis écart. Ensuite (égalité à trois ou plus), les
+ * critères généraux.
  */
 export function standings(
   teamIds: readonly string[],
@@ -175,17 +204,19 @@ export function standings(
   compare: (x: TeamStats, y: TeamStats) => number = compareStats,
 ): TeamStats[] {
   const headToHead = (x: TeamStats, y: TeamStats): number => {
-    const match = matches.find(
-      (m) =>
-        m.status === 'done' &&
-        !m.bye &&
-        [m.a.teamId, m.b.teamId].includes(x.teamId) &&
-        [m.a.teamId, m.b.teamId].includes(y.teamId),
-    );
-    if (!match) return 0;
-    const side = evaluateMatch(match, rulesOf(rulesSource, match)).winner;
-    const winner = side ? match[side].teamId : null;
-    return winner === x.teamId ? -1 : winner === y.teamId ? 1 : 0;
+    let wins = 0;
+    let diff = 0;
+    for (const m of matches) {
+      if (m.status !== 'done' || m.bye) continue;
+      const sideX = sideOf(m, x.teamId);
+      const sideY = sideOf(m, y.teamId);
+      if (!sideX || !sideY || sideX === sideY) continue;
+      const result = evaluateMatch(m, rulesOf(rulesSource, m));
+      if (!result.winner) continue;
+      wins += result.winner === sideX ? 1 : -1;
+      diff += sideX === 'a' ? result.pointsA - result.pointsB : result.pointsB - result.pointsA;
+    }
+    return -wins || -diff;
   };
   return [...computeStats(teamIds, matches, rulesSource).values()].sort(
     (x, y) => compare(x, y) || headToHead(x, y) || compareStats(x, y),

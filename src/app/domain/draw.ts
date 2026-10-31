@@ -1,5 +1,6 @@
 import { DrawMode, LEVELS, Match, Pool, Team, TournamentSettings } from '../core/models';
 import { shuffle } from './random';
+import { matchTeams } from './scoring';
 
 /** Ordonne les équipes avant répartition : les premières seront séparées au maximum. */
 export function orderForDraw(teams: readonly Team[], mode: DrawMode, seed: number): Team[] {
@@ -70,7 +71,7 @@ export function schedule(matches: readonly Match[], settings: TournamentSettings
       slotOf.set(match.id, firstSlot - 1);
       return { ...match, slot: -1, court: 0 };
     }
-    const teams = [match.a.teamId, match.b.teamId].filter((id): id is string => id !== null);
+    const teams = matchTeams(match);
     const after = [match.a.from, match.b.from]
       .map((from) => (from ? slotOf.get(from.matchId) : undefined))
       .filter((s): s is number => s !== undefined);
@@ -128,34 +129,29 @@ export function chunkIntoPools(orderedIds: readonly string[], poolCount: number,
 }
 
 /**
- * Rotations d'une poule de 3 ou 4, une liste de matchs par rotation.
- * Poule de 4 : AB/CD, AC/BD, AD/BC. Poule de 3 : AB, AC, BC (une équipe au repos à chaque rotation).
+ * Matchs d'une poule en 4 contre 4 (deux paires par camp).
+ *
+ * Poule de 4 : A+B / C+D, A+C / B+D, A+D / B+C. Chaque paire joue les trois matchs, avec un
+ * partenaire différent à chaque fois.
+ *
+ * Poule de 5 : 5 matchs, une paire au repos à chacun. Chaque paire joue 4 matchs, se repose une
+ * fois, est partenaire exactement une fois de chacune des 4 autres et affronte chacune deux fois.
  */
-export function poolRotations<T>(items: readonly T[]): [T, T][][] {
-  const [a, b, c, d] = items;
-  if (items.length === 3) return [[[a, b]], [[a, c]], [[b, c]]];
+export function mixerRotations<T>(pairs: readonly T[]): [[T, T], [T, T]][] {
+  if (pairs.length === 5) {
+    const [p1, p2, p3, p4, p5] = pairs;
+    return [
+      [[p1, p2], [p3, p4]], // repos : 5
+      [[p1, p3], [p2, p5]], // repos : 4
+      [[p1, p5], [p2, p4]], // repos : 3
+      [[p1, p4], [p3, p5]], // repos : 2
+      [[p2, p3], [p4, p5]], // repos : 1
+    ];
+  }
+  const [a, b, c, d] = pairs;
   return [
     [[a, b], [c, d]],
     [[a, c], [b, d]],
     [[a, d], [b, c]],
   ];
-}
-
-/**
- * Garantit au moins 3 équipes par poule après un brassage incomplet :
- * une poule trop petite reçoit la dernière équipe de la poule de 4 la plus proche, en priorité celle du dessus.
- */
-export function rebalancePools(pools: string[][]): string[][] {
-  const result = pools.map((p) => [...p]);
-  for (let guard = 0; guard < 16; guard++) {
-    const short = result.findIndex((p) => p.length < 3);
-    if (short === -1) break;
-    const above = [...result.keys()].filter((j) => j < short && result[j].length === 4).at(-1);
-    const below = [...result.keys()].find((j) => j > short && result[j].length === 4);
-    const donor = above ?? below;
-    if (donor === undefined) break;
-    if (donor < short) result[short].unshift(result[donor].pop()!);
-    else result[short].push(result[donor].shift()!);
-  }
-  return result;
 }

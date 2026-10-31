@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom, map } from 'rxjs';
-import { Match, Tournament } from '../core/models';
+import { Match, MatchSlot, Tournament } from '../core/models';
 import { matchTime } from '../domain/draw';
 import { formatName } from '../domain/formats';
 import { TeamStats, evaluateMatch, playedSets } from '../domain/scoring';
@@ -16,8 +16,10 @@ import {
   matchRules,
   poolStandings,
   progress,
+  stageLevels,
+  withLevelStarts,
 } from '../domain/tournament-engine';
-import { matchTag, matchTagClass } from '../shared/match-display';
+import { levelClass, matchTag, matchTagClass } from '../shared/match-display';
 import { TeamAvatar } from '../shared/team-avatar';
 import { PublicCompetitionsApi } from './public-competitions-api';
 
@@ -35,8 +37,8 @@ function toCard(t: Tournament, m: Match, name: NameOf) {
     m,
     tag: matchTag(m),
     time: matchTime(m, t.settings),
-    a: name(m.a.teamId),
-    b: name(m.b.teamId),
+    a: sideName(m.a, name),
+    b: sideName(m.b, name),
     // En set unique on affiche les points, sinon les sets gagnés.
     scoreA: started ? (single ? result.pointsA : result.setsA) : '–',
     scoreB: started ? (single ? result.pointsB : result.setsB) : '–',
@@ -44,6 +46,11 @@ function toCard(t: Tournament, m: Match, name: NameOf) {
     detail: single ? '' : playedSets(m).map((s) => `${s[0]}-${s[1]}`).join(' · '),
     referee: m.referee ? name(m.referee) : null,
   };
+}
+
+/** Nom d'un camp : une équipe, ou deux paires en 4 contre 4. */
+function sideName(slot: MatchSlot, name: NameOf): string {
+  return slot.partnerId ? `${name(slot.teamId)} + ${name(slot.partnerId)}` : name(slot.teamId);
 }
 
 function toRows(stats: TeamStats[], name: NameOf) {
@@ -115,7 +122,7 @@ export class PublicCompetitionPage {
     const t = this.t();
     if (!t || t.stage === 'setup') return [];
     if (t.format === 'league') {
-      return [{ key: 'league', title: 'Classement', open: true, pools: [{ title: '', rows: toRows(leagueStandings(t), this.name()) }] }];
+      return [{ key: 'league', title: 'Classement', open: true, pools: [{ title: '', level: undefined, rows: toRows(leagueStandings(t), this.name()) }] }];
     }
     const stages = t.format === 'mixer' ? Array.from({ length: currentStage(t) }, (_, i) => currentStage(t) - i) : [undefined];
     return stages.map((stage, i) => ({
@@ -125,7 +132,8 @@ export class PublicCompetitionPage {
       pools: t.pools
         .filter((p) => p.stage === stage)
         .map((p) => ({
-          title: `Poule ${p.letter}${p.name && !p.name.startsWith('Niveau') ? ` · ${p.name}` : ''}`,
+          title: `Poule ${p.letter}`,
+          level: stage ? stageLevels(t, stage).get(p.letter) : undefined,
           rows: toRows(poolStandings(t, p), this.name()),
         })),
     }));
@@ -133,6 +141,9 @@ export class PublicCompetitionPage {
 
   /** Poules brassées : classement à l'écart de points (mis en avant), points marqués à titre indicatif. */
   protected readonly diffRanking = computed(() => this.t()?.format === 'mixer');
+  protected readonly levelClass = levelClass;
+  /** Classement avec un intertitre au début de chaque niveau (poules brassées, à partir de la phase 2). */
+  protected readonly rankingRows = computed(() => withLevelStarts(this.ranking()));
   protected readonly ranking = computed<RankingRow[]>(() =>
     this.t() && this.t()!.stage !== 'setup' ? finalRanking(this.t()!) : [],
   );

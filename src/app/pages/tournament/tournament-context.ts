@@ -21,7 +21,8 @@ export class TournamentContext {
   /** Nom d'une équipe d'un match, ou sa provenance (« Vainqueur Demi-finale 1 ») si elle n'est pas encore connue. */
   slotName(match: Match, side: Side, matches: readonly Match[] = this.tournament()?.matches ?? []): string {
     const slot = match[side];
-    if (slot.teamId) return this.teamName(slot.teamId);
+    // En 4 contre 4, un camp réunit deux paires.
+    if (slot.teamId) return slot.partnerId ? `${this.teamName(slot.teamId)} + ${this.teamName(slot.partnerId)}` : this.teamName(slot.teamId);
     if (slot.from) {
       const source = matches.find((m) => m.id === slot.from!.matchId);
       return `${slot.from.take === 'winner' ? 'Vainqueur' : 'Perdant'} ${source?.label ?? ''}`.trim();

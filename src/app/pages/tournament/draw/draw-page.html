@@ -64,7 +64,11 @@
                     @if (mixer) {
                       Niveau moyen {{ averageRating(p.teamIds) }} ·
                     }
-                    {{ p.teamIds.length }} équipes · {{ (p.teamIds.length * (p.teamIds.length - 1)) / 2 }} matchs
+                    @if (mixer) {
+                      {{ p.teamIds.length }} paires · {{ p.teamIds.length === 5 ? 5 : 3 }} matchs en 4 contre 4
+                    } @else {
+                      {{ p.teamIds.length }} équipes · {{ (p.teamIds.length * (p.teamIds.length - 1)) / 2 }} matchs
+                    }
                   </span>
                 </div>
                 <ol>

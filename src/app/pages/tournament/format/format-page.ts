@@ -1,15 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormatId, Tournament, TournamentSettings } from '../../../core/models';
-import {
-  FORMATS,
-  MIXER_MAX_TEAMS,
-  MIXER_MIN_TEAMS,
-  estimateMatches,
-  formatName,
-  mixerPoolCount,
-  mixerPoolSizes,
-} from '../../../domain/formats';
+import { FORMATS, MIXER_SIZES, estimateMatches, formatName } from '../../../domain/formats';
 import { Icon } from '../../../shared/icon';
 import { usableCourts } from '../../../domain/tournament-engine';
 import { TournamentContext } from '../tournament-context';
@@ -40,23 +32,11 @@ export class FormatPage {
   protected readonly courtsLimited = computed(
     () => this.t().teams.length > 0 && this.usableCourts() < this.t().settings.courts,
   );
-  protected readonly mixerMin = MIXER_MIN_TEAMS;
-  protected readonly mixerMax = MIXER_MAX_TEAMS;
-  protected readonly mixerMinMax = computed(() => Math.max(MIXER_MIN_TEAMS, this.t().teams.length));
-  /** Nombre d'équipes pris en compte pour décrire les poules : les inscrits, sinon la capacité. */
-  private readonly mixerTeams = computed(() => {
-    const t = this.t();
-    const n = t.teams.length >= MIXER_MIN_TEAMS ? t.teams.length : t.settings.maxTeams;
-    return Math.min(MIXER_MAX_TEAMS, Math.max(MIXER_MIN_TEAMS, n));
-  });
-  protected readonly mixerPools = computed(() => mixerPoolCount(this.mixerTeams()));
-  protected readonly mixerLayout = computed(() => {
-    const sizes = mixerPoolSizes(this.mixerTeams());
-    const fours = sizes.filter((s) => s === 4).length;
-    const threes = sizes.length - fours;
-    const parts = [fours && `${fours} poule${fours > 1 ? 's' : ''} de 4`, threes && `${threes} poule${threes > 1 ? 's' : ''} de 3`];
-    return `${this.mixerTeams()} équipes → ${parts.filter(Boolean).join(' et ')}`;
-  });
+  protected readonly mixerSizes = MIXER_SIZES;
+
+  protected setMixerTeams(maxTeams: number): void {
+    this.ctx.store.updateSettings(this.t().id, { maxTeams });
+  }
 
   protected rename(event: Event): void {
     this.ctx.store.rename(this.t().id, (event.target as HTMLInputElement).value);

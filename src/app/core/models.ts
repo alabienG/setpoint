@@ -59,6 +59,8 @@ export type SetScore = [number | null, number | null];
 
 export interface MatchSlot {
   teamId: string | null;
+  /** Poules brassées (4 contre 4) : seconde paire du camp, qui joue avec `teamId`. */
+  partnerId?: string;
   /** Dans un tableau final : l'équipe vient du vainqueur ou du perdant d'un autre match. */
   from?: { matchId: string; take: 'winner' | 'loser' };
 }
@@ -74,7 +76,8 @@ export interface Match {
   start?: number;
   round: number;
   label: string;
-  kind?: 'final' | 'third';
+  /** final / third : tableau final ; tiebreak : barrage entre paires à égalité (poules brassées). */
+  kind?: 'final' | 'third' | 'tiebreak';
   a: MatchSlot;
   b: MatchSlot;
   /** Créneau horaire (0 = premier créneau), -1 si non programmé. */

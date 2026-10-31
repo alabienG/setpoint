@@ -390,6 +390,38 @@ select {
   background: #efe7ff;
   color: #5b21b6;
 }
+.level {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.level--0 {
+  background: var(--orange);
+  color: #fff;
+}
+.level--1 {
+  background: var(--blue);
+  color: #fff;
+}
+.level--2 {
+  background: #0f766e;
+  color: #fff;
+}
+.level--3 {
+  background: var(--ink-3);
+  color: #fff;
+}
+.level-row td {
+  padding-top: 18px;
+  border-top: 0;
+  text-align: left;
+}
 .tag--bracket {
   background: var(--navy);
   color: #fff;

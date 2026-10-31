@@ -48,7 +48,7 @@ export class LiveScorePage {
     const single = maxSets(settings) === 1;
     const setWon = setWinner(score, index, settings);
     const over = !!result.winner;
-    const names = { a: this.ctx.teamName(m.a.teamId), b: this.ctx.teamName(m.b.teamId) };
+    const names = { a: this.ctx.slotName(m, 'a'), b: this.ctx.slotName(m, 'b') };
 
     let hint = `${single ? 'Set unique' : `Set ${index + 1}`} en ${target} points, 2 points d’écart${cap !== null ? ` (plafond ${cap})` : ''}`;
     if (setWon) hint = `Set remporté par ${names[setWon]}`;

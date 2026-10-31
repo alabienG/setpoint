@@ -4,12 +4,15 @@ import { evaluateMatch, playedSets, winnerSide } from '../../../domain/scoring';
 import {
   RankingRow,
   currentStage,
+  stageLevels,
+  withLevelStarts,
   finalRanking,
   poolStandings,
   qualifierTags,
   stagePools,
 } from '../../../domain/tournament-engine';
 import { Icon } from '../../../shared/icon';
+import { levelClass } from '../../../shared/match-display';
 import { TeamAvatar } from '../../../shared/team-avatar';
 import { TournamentContext } from '../tournament-context';
 
@@ -39,6 +42,9 @@ export class ResultsPage {
   protected readonly t = computed(() => this.ctx.tournament() as Tournament);
   protected readonly finished = computed(() => this.t().stage === 'finished');
   protected readonly ranking = computed(() => finalRanking(this.t()));
+  /** Classement avec un intertitre au début de chaque niveau (poules brassées, à partir de la phase 2). */
+  protected readonly rankingRows = computed(() => withLevelStarts(this.ranking()));
+  protected readonly levelClass = levelClass;
 
   /** Podium dans l'ordre d'affichage : 2e, 1er, 3e. */
   protected readonly podium = computed(() => {
@@ -56,12 +62,14 @@ export class ResultsPage {
   protected readonly mixerPools = computed(() => {
     const t = this.t();
     const stage = currentStage(t);
+    const levels = stageLevels(t, stage);
     let offset = 0;
     return {
       stage,
       pools: stagePools(t, stage).map((p) => {
         const entry = {
           pool: p,
+          level: levels.get(p.letter),
           offset,
           rows: poolStandings(t, p).map((row) => ({ ...row, name: this.ctx.teamName(row.teamId) })),
         };

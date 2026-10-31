@@ -8,7 +8,7 @@ import {
   matchRules,
   normalize,
 } from '../domain/tournament-engine';
-import { MIXER_MAX_TEAMS } from '../domain/formats';
+import { MIXER_DEFAULT_TEAMS, MIXER_SIZES } from '../domain/formats';
 import { newId, randomSeed } from '../domain/random';
 import { evaluateMatch, maxSets } from '../domain/scoring';
 import { ImportedTeam } from '../domain/team-import';
@@ -110,8 +110,9 @@ export class TournamentStore {
   setFormat(id: string, format: FormatId): void {
     this.updateSetup(id, (t) => {
       if (format !== 'mixer') return { ...t, format };
-      // Modèle « Poules brassées » : jusqu'à 16 équipes, 3 terrains, poules de niveau homogène.
-      const maxTeams = Math.max(MIXER_MAX_TEAMS, t.teams.length);
+      // Modèle « Poules brassées » : 12 ou 16 paires en 4 contre 4, 3 terrains, poules de niveau homogène.
+      const keep = MIXER_SIZES.includes(t.settings.maxTeams) && t.teams.length <= t.settings.maxTeams;
+      const maxTeams = keep ? t.settings.maxTeams : MIXER_DEFAULT_TEAMS;
       return {
         ...t,
         format,

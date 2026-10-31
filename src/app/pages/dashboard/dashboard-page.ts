@@ -90,7 +90,7 @@ export class DashboardPage {
       where: `${matchTag(m)} · Terrain ${m.court}`,
       setLabel: maxSets(rules) === 1 ? 'En cours' : setLabel(index, rules),
       rows: (['a', 'b'] as const).map((side, i) => ({
-        name: name(m[side].teamId),
+        name: m[side].partnerId ? `${name(m[side].teamId)} + ${name(m[side].partnerId!)}` : name(m[side].teamId),
         previous: m.sets.slice(0, index).map((s) => s[i]),
         current: current[i],
         leading: (current[i] ?? 0) > (current[1 - i] ?? 0),

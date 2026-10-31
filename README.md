@@ -30,23 +30,37 @@ COMPETITIONS_ORGANIZER_USERNAME=organisateur COMPETITIONS_ORGANIZER_PASSWORD=Dev
 | `/organisateur/:id/format` … `/resultats` | organisateur | Format, participants, tirage, matchs & scores, résultats |
 | `/organisateur/:id/matchs/:matchId/direct` | organisateur | Saisie point par point sur mobile |
 
-Formats disponibles : poules + phase finale, poules brassées (9 à 16 équipes), élimination directe, championnat.
+Formats disponibles : poules + phase finale, poules brassées (12, 15 ou 16 paires en 4 contre 4), élimination directe, championnat.
 
-### Poules brassées (9 à 16 équipes)
+### Poules brassées (12, 15 ou 16 paires, 4 contre 4)
 
-Trois phases de poules de 4 (ou de 3 quand il manque des équipes) ; 4 poules de 13 à 16 équipes, 3 poules de 9 à 12.
+Chaque équipe inscrite est une paire. Les matchs se jouent en 4 contre 4 : dans chaque poule de
+4 paires, A+B contre C+D, A+C contre B+D, A+D contre B+C (3 matchs, chaque paire joue les trois
+avec un partenaire différent). Le classement reste individuel par paire : écart cumulé de son camp.
 
-À 16 équipes, selon le modèle de l'organisateur :
+À 16 paires (4 poules), selon le modèle de l'organisateur :
 
 1. Poules de niveau homogène, 1 set de 19 pts, plafond 21, 20 min.
 2. Principale (1ers et 2es) et consolante (3es et 4es), 1 set de 25, plafond 27, 25 min.
 3. Poules des places 1-4, 5-8, 9-12 et 13-16, 1 set de 25, 30 min.
 
-À 12 équipes : phase 2 par rang (principale, intermédiaire, consolante), puis montée / descente.
-Les places du brassage qui n'existent pas restent vides ; une poule réduite à 2 équipes récupère
-la dernière équipe de la poule de 4 la plus proche au-dessus.
+Une phase = 12 matchs en 4 tours sur 3 terrains (une poule au repos par tour). À 12 paires
+(3 poules) : phase 2 par rang (principale, intermédiaire, consolante), puis montée / descente.
 
-Classement d'une poule : écart de points (marqués − encaissés) ; deux équipes à égalité se départagent à la confrontation directe.
+À 15 paires : 3 poules de 5. Chaque poule joue 5 matchs avec une paire au repos à chacun (elle arbitre
+le match de sa poule en auto-arbitrage) ; chaque paire joue 4 matchs, est partenaire une fois de chacune
+des 4 autres et les affronte deux fois. Phase = 15 matchs en 5 tours. Brassage comme à 12 paires,
+phase 3 : places 1-5, 6-10, 11-15.
+
+À partir de la phase 2, le niveau de chaque paire (Principale, Intermédiaire, Consolante, puis
+Places 1 à 4…) est mis en évidence par une pastille dans les classements, et le classement général
+est découpé par niveau.
+
+Départage : deux paires à égalité d'écart jouent un barrage en 2 contre 2, en 6 points (la première
+à 6 gagne), créé automatiquement dès que la poule a joué ses 3 matchs et programmé à la suite de la
+phase. Il ne compte pas dans l'écart. À trois paires ou plus, chacune affronte les autres, puis
+victoires et écart en barrage. (La confrontation directe ne peut pas départager : dans une poule de
+4 paires, deux paires à égalité d'écart le sont aussi sur les deux matchs où elles s'affrontent.)
 
 ### Auto-arbitrage
 
@@ -54,8 +68,8 @@ Option de l'étape Format, avant le tirage : chaque match est arbitré par une �
 sur ce créneau ; on choisit toujours celle qui a le moins arbitré (sur tout le tournoi), de préférence
 dans la même poule. Chaque match mobilisant trois équipes, le planning ne programme pas plus de
 matchs simultanés que le nombre d'équipes divisé par trois. En poules, l'écart entre équipes est d'au
-plus un arbitrage ; en tableau final, il peut monter à deux (seules les équipes éliminées sont libres
-pour les derniers tours). Logique : `src/app/domain/referees.ts`.
+plus un arbitrage en championnat ; en poules brassées et en tableau final, il peut monter à deux
+(seules les paires de la poule au repos, ou les équipes déjà éliminées, sont libres). Logique : `src/app/domain/referees.ts`.
 
 ### Import des participants
 

@@ -22,7 +22,7 @@ export const FORMATS: readonly FormatInfo[] = [
     id: 'mixer',
     name: 'Poules brassées',
     description:
-      'Trois phases de poules de 4 : groupes de niveau homogène, puis brassage principale / consolante jusqu’au classement complet.',
+      'Paires en 4 contre 4, poules de 4 paires sur trois phases : niveau homogène, puis brassage principale / consolante jusqu’au classement complet.',
     available: true,
   },
   {
@@ -58,27 +58,28 @@ export const FORMATS: readonly FormatInfo[] = [
 ];
 
 /**
- * Le format « Poules brassées » se joue en poules de 3 ou 4 :
- * 4 poules de 13 à 16 équipes, 3 poules de 9 à 12 équipes.
+ * Le format « Poules brassées » se joue en 4 contre 4 : deux paires contre deux paires.
+ *   • 12 paires : 3 poules de 4 ; 16 paires : 4 poules de 4 (3 matchs par poule, tout le monde joue) ;
+ *   • 15 paires : 3 poules de 5 (5 matchs par poule, une paire au repos à chaque match).
  */
-export const MIXER_MIN_TEAMS = 9;
-export const MIXER_MAX_TEAMS = 16;
+export const MIXER_SIZES: readonly number[] = [12, 15, 16];
+export const MIXER_DEFAULT_TEAMS = 16;
 export const MIXER_PHASES = 3;
 
-export function mixerPoolCount(teams: number): number {
-  return teams > 12 ? 4 : 3;
+/** Taille des poules : 5 paires à 15, sinon 4. */
+export function mixerPoolSize(teams: number): number {
+  return teams === 15 ? 5 : 4;
 }
 
-/** Tailles des poules, les poules de 4 d'abord (ex. 14 équipes → 4, 4, 3, 3). */
-export function mixerPoolSizes(teams: number): number[] {
-  const pools = mixerPoolCount(teams);
-  const fours = Math.max(0, Math.min(pools, teams - 3 * pools));
-  return Array.from({ length: pools }, (_, i) => (i < fours ? 4 : 3));
+/** Matchs d'une poule : 3 pour 4 paires, 5 pour 5 paires. */
+export function mixerPoolMatches(poolSize: number): number {
+  return poolSize === 5 ? 5 : 3;
 }
 
-/** Matchs d'une phase : 6 par poule de 4, 3 par poule de 3. */
+/** Matchs d'une phase. */
 export function mixerMatchesPerStage(teams: number): number {
-  return mixerPoolSizes(teams).reduce((sum, size) => sum + (size * (size - 1)) / 2, 0);
+  const size = mixerPoolSize(teams);
+  return (teams / size) * mixerPoolMatches(size);
 }
 
 export function formatName(id: FormatId): string {
@@ -108,8 +109,8 @@ export function estimateMatches(format: FormatId, settings: TournamentSettings):
       return `${total} matchs pour ${n} équipes`;
     }
     case 'mixer': {
-      const teams = Math.min(MIXER_MAX_TEAMS, Math.max(MIXER_MIN_TEAMS, n));
-      return `${mixerMatchesPerStage(teams) * MIXER_PHASES} matchs en ${MIXER_PHASES} phases pour ${teams} équipes`;
+      const teams = MIXER_SIZES.includes(n) ? n : MIXER_DEFAULT_TEAMS;
+      return `${mixerMatchesPerStage(teams) * MIXER_PHASES} matchs en 4 contre 4 pour ${teams} paires`;
     }
     case 'elim':
       return `${eliminationCount(n)} matchs pour ${n} équipes`;

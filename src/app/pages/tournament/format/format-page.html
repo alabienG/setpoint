@@ -56,15 +56,31 @@
 
       @if (mixer()) {
         <div class="phases">
+          <div class="group">
+            <span class="label" id="pairs-label">Nombre de paires</span>
+            <div class="segmented" role="group" aria-labelledby="pairs-label">
+              @for (size of mixerSizes; track size) {
+                <button type="button" [attr.aria-pressed]="s.maxTeams === size" [disabled]="locked() || t().teams.length > size" (click)="setMixerTeams(size)">
+                  {{ size }} paires
+                </button>
+              }
+            </div>
+          </div>
           <p class="phases-intro">
-            De {{ mixerMin }} à {{ mixerMax }} équipes, en poules de 4 (ou de 3 s’il en manque) :
-            <strong>{{ mixerLayout() }}</strong>.
-            @if (mixerPools() === 3) {
+            Matchs en <strong>4 contre 4</strong> : deux paires contre deux paires, avec un partenaire différent à
+            chaque match (poule de 4 : A+B contre C+D, A+C contre B+D, A+D contre B+C). Chaque paire est classée
+            individuellement.
+            @if (s.maxTeams === 15) {
+              15 paires : 3 poules de 5, chaque poule joue 5 matchs (une paire au repos à chaque match, qui
+              arbitre en auto-arbitrage) ; chaque paire joue 4 matchs, une fois avec chacune des autres.
+              Phase 2 : poules par rang (principale, intermédiaire, consolante). Phase 3 : montée / descente,
+              poules des places 1-5, 6-10 et 11-15.
+            } @else if (s.maxTeams === 12) {
               Phase 1 : poules de niveau homogène. Phase 2 : poules par rang (principale, intermédiaire, consolante).
               Phase 3 : montée / descente, poules de classement.
             } @else {
               Phase 1 : poules de niveau homogène. Phase 2 : principale (2 premiers) et consolante. Phase 3 : poules
-              de classement (places 1-4, 5-8…).
+              des places 1-4, 5-8, 9-12 et 13-16.
             }
           </p>
           @for (p of s.phases; track $index; let i = $index) {
@@ -89,10 +105,6 @@
           <label class="field">
             Terrains
             <input type="number" min="1" max="20" [value]="s.courts" [disabled]="locked()" (change)="setNumber('courts', $event, 1, 20)" />
-          </label>
-          <label class="field">
-            Équipes max
-            <input type="number" [min]="mixerMinMax()" [max]="mixerMax" [value]="s.maxTeams" [disabled]="locked()" (change)="setNumber('maxTeams', $event, mixerMinMax(), mixerMax)" />
           </label>
         </div>
       } @else {
@@ -158,7 +170,7 @@
       <div class="points">
         <strong>Classement</strong>
         @if (mixer()) {
-          <span>À l’écart de points (points marqués − points encaissés). En cas d’égalité, la confrontation directe départage.</span>
+          <span>À l’écart de points de chaque paire (points marqués − points encaissés par son camp). Deux paires à égalité jouent un barrage en 2 contre 2, en 6 points.</span>
         } @else if (s.setsToWin === 1) {
           <span>Victoires, puis écart de points, puis points marqués, puis confrontation directe.</span>
         } @else {

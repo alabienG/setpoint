@@ -18,5 +18,11 @@ export function poolTagClass(id: string): string {
 /** Libellé court d'un match : « Poule A », « P2 · Poule 3 », « Demi-finale 1 »… */
 export function matchTag(match: Match): string {
   if (match.phase !== 'pool') return match.label;
+  if (match.kind === 'tiebreak') return `P${match.stage} · Barrage poule ${match.pool}`;
   return match.stage ? `P${match.stage} · Poule ${match.pool}` : `Poule ${match.pool}`;
+}
+
+/** Pastille d'un niveau de poules brassées (0 = Principale / Places 1 à 4…). */
+export function levelClass(rank: number): string {
+  return `level level--${Math.min(rank, 3)}`;
 }
